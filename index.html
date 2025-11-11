@@ -586,7 +586,7 @@
             <p class="subtitle">Real-time monitoring odběru elektrické energie</p>
             <div class="live-indicator">
                 <div class="live-dot"></div>
-                <span>LIVE DATA - ThingSpeak</span>
+                <span>LIVE DATA - Google Sheets</span>
             </div>
             <div style="margin-top: 15px; font-size: 1.1em; font-weight: 600; color: rgba(255,255,255,0.9);">
                 🕐 <span id="currentTime">Načítání...</span>
@@ -601,7 +601,7 @@
         </header>
 
         <div id="lastUpdate" class="last-update"></div>
-        <div id="loading" class="loading">⏳ Načítám data z ThingSpeak</div>
+        <div id="loading" class="loading">⏳ Načítám data z Google Sheets</div>
         <div id="error" class="error" style="display: none;"></div>
         <div id="success" class="success" style="display: none;"></div>
 
@@ -759,7 +759,7 @@
     </div>
 
     <script>
-        const CHANNEL_ID = '3100560';
+        const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyMBjZ_y8qTtpexHYVroyt1xe50e4S0qg3OrD5K01dlKHeEiiYBGSlT5cRp1xixvNDoZQ/exec';
         const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
 
         let rawData = [];
@@ -840,79 +840,153 @@
         }
 
         async function loadData() {
-            const url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=8000000`;
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('error').style.display = 'none';
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('error').style.display = 'none';
+    document.getElementById('success').style.display = 'none';
+
+    try {
+        console.log('Načítám z URL:', GOOGLE_SHEETS_URL);
+        
+        const response = await fetch(GOOGLE_SHEETS_URL, {
+            method: 'GET',
+            redirect: 'follow'
+        });
+        
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const csvText = await response.text();
+        console.log('Načteno znaků:', csvText.length);
+        console.log('První řádky:', csvText.split('\n').slice(0, 3).join('\n'));
+        
+        parseGoogleSheetsData(csvText);
+        
+        document.getElementById('lastUpdate').textContent = 
+            `Poslední aktualizace: ${formatDateTime(new Date())} | Načteno ${rawData.length} záznamů`;
+        
+        document.getElementById('success').textContent = 
+            `✅ Úspěšně načteno ${rawData.length} měření!`;
+        document.getElementById('success').style.display = 'block';
+        setTimeout(() => {
             document.getElementById('success').style.display = 'none';
+        }, 5000);
+    } catch (error) {
+        console.error('Chyba načítání dat:', error);
+        showError(error.message);
+    }
+}
 
-            try {
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' }
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Nelze načíst data z ThingSpeak');
-                }
-                
-                const data = await response.json();
-                parseThingSpeakData(data);
-                
-                document.getElementById('lastUpdate').textContent = 
-                    `Poslední aktualizace: ${formatDateTime(new Date())} | Načteno ${rawData.length} záznamů`;
-                
-                document.getElementById('success').textContent = 
-                    `✅ Úspěšně načteno ${rawData.length} měření!`;
-                document.getElementById('success').style.display = 'block';
-                setTimeout(() => {
-                    document.getElementById('success').style.display = 'none';
-                }, 5000);
-            } catch (error) {
-                showError(error.message);
-            }
+function parseGoogleSheetsData(csvText) {
+    try {
+        const lines = csvText.trim().split('\n');
+        
+        if (lines.length === 0) {
+            throw new Error('Žádná data v tabulce');
         }
 
-        function parseThingSpeakData(data) {
-            try {
-                if (!data.feeds || data.feeds.length === 0) {
-                    throw new Error('Žádná data z ThingSpeak');
-                }
+        console.log('Celkem řádků:', lines.length);
+        console.log('Druhý řádek (první data):', lines[1]);
 
-                rawData = data.feeds
-                    .filter(feed => feed.field1 && feed.field2 && feed.field3 && feed.field4)
-                    .map(feed => ({
-                        datetime: new Date(feed.created_at),
-                        spotrebaKwh: parseFloat(feed.field1) || 0,
-                        vykonW: parseFloat(feed.field2) || 0,
-                        napeti: parseFloat(feed.field3) || 0,
-                        proud: parseFloat(feed.field4) || 0
-                    }));
-
-                if (rawData.length === 0) {
-                    throw new Error('Žádná platná data');
-                }
-
-                rawData.sort((a, b) => a.datetime - b.datetime);
-
-                let cumulative = 0;
-                rawData.forEach(d => {
-                    cumulative += d.spotrebaKwh;
-                    d.kumulativniSpotrebaKwh = cumulative;
-                });
-
-                document.getElementById('loading').style.display = 'none';
-                showDashboard();
-                
-                if (Object.keys(charts).length === 0) {
-                    initializeCharts();
-                    setTimeout(createNavigatorsForCharts, 500);
-                }
-                
-                updateCharts();
-            } catch (error) {
-                showError('Chyba zpracování dat: ' + error.message);
+        // Přeskoč hlavičku
+        rawData = [];
+        
+        for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(',');
+            
+            if (values.length < 5) {
+                console.log('Řádek', i, 'má méně než 5 sloupců:', values.length);
+                continue;
             }
+            
+            // Parsuj datum (formát: "dd.MM.yyyy HH:mm:ss")
+            let datetime;
+            const dateStr = values[0];
+            
+            if (dateStr.includes('.')) {
+                // Formát: "dd.MM.yyyy HH:mm:ss"
+                const parts = dateStr.split(' ');
+                if (parts.length >= 2) {
+                    const datePart = parts[0];
+                    const timePart = parts[1];
+                    const [day, month, year] = datePart.split('.');
+                    datetime = new Date(`${year}-${month}-${day}T${timePart}`);
+                } else {
+                    datetime = new Date(dateStr);
+                }
+            } else {
+                datetime = new Date(dateStr);
+            }
+            
+            if (isNaN(datetime.getTime())) {
+                console.log('Neplatné datum na řádku', i, ':', dateStr);
+                continue;
+            }
+            
+            // Parsuj čísla - nahraď čárky tečkami pro desetinná čísla
+            const parseNumber = (str) => {
+                if (!str || str.trim() === '') return 0;
+                // Odstraň mezery a nahraď čárku tečkou
+                return parseFloat(str.trim().replace(',', '.')) || 0;
+            };
+            
+            const spotrebaKwh = parseNumber(values[1]);
+            const vykonW = parseNumber(values[2]);
+            const napeti = parseNumber(values[3]);
+            const proud = parseNumber(values[4]);
+            
+            console.log(`Řádek ${i}:`, {
+                datetime,
+                spotrebaKwh,
+                vykonW,
+                napeti,
+                proud
+            });
+            
+            rawData.push({
+                datetime,
+                spotrebaKwh,
+                vykonW,
+                napeti,
+                proud
+            });
         }
+
+        console.log('Úspěšně zpracováno záznamů:', rawData.length);
+        
+        if (rawData.length === 0) {
+            throw new Error('Žádná platná data po zpracování');
+        }
+
+        // Seřaď podle času
+        rawData.sort((a, b) => a.datetime - b.datetime);
+        
+        // Vypočítej kumulativní spotřebu
+        let cumulative = 0;
+        rawData.forEach(d => {
+            cumulative += d.spotrebaKwh;
+            d.kumulativniSpotrebaKwh = cumulative;
+        });
+        
+        console.log('První záznam:', rawData[0]);
+        console.log('Poslední záznam:', rawData[rawData.length - 1]);
+
+        document.getElementById('loading').style.display = 'none';
+        showDashboard();
+        
+        if (Object.keys(charts).length === 0) {
+            initializeCharts();
+            setTimeout(createNavigatorsForCharts, 500);
+        }
+        
+        updateCharts();
+    } catch (error) {
+        console.error('Chyba při parsování:', error);
+        showError('Chyba zpracování dat: ' + error.message);
+    }
+}
 
         function showError(msg) {
             document.getElementById('loading').style.display = 'none';
@@ -1972,5 +2046,4 @@
         }
     </script>
 </body>
-
 </html>
