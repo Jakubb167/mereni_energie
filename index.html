@@ -15,1123 +15,6 @@
             box-sizing: border-box;
         }
 
-        function getMidnightLines(data) {
-            if (!data || data.length === 0) return [];
-            
-            const lines = [];
-            let lastDate = null;
-            
-            data.forEach(d => {
-                const currentDate = d.datetime.toDateString();
-                if (lastDate && lastDate !== currentDate) {
-                    const midnight = new Date(d.datetime);
-                    midnight.setHours(0, 0, 0, 0);
-                    lines.push(midnight);
-                }
-                lastDate = currentDate;
-            });
-            
-            return lines;
-        }
-
-        function addMidnightLinesToChart(chart, midnightLines) {
-            if (!chart.options.plugins) chart.options.plugins = {};
-            if (!chart.options.plugins.annotation) chart.options.plugins.annotation = { annotations: {} };
-            
-            chart.options.plugins.annotation.annotations = {};
-            
-            midnightLines.forEach((midnight, index) => {
-                chart.options.plugins.annotation.annotations[`midnight${index}`] = {
-                    type: 'line',
-                    xMin: midnight,
-                    xMax: midnight,
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                    borderWidth: 2,
-                    borderDash: [5, 5],
-                    label: { display: false }
-                };
-            });
-        }
-
-        function updateAllCharts(data) {
-            const midnightLines = getMidnightLines(data);
-            
-            const deltaData = [];
-            for (let i = 0; i < data.length; i++) {
-                if (data[i].spotrebaKwh > 0) {
-                    deltaData.push({ 
-                        x: data[i].datetime, 
-                        y: data[i].spotrebaKwh 
-                    });
-                }
-            }
-            
-            charts.delta.data.datasets = [{
-                label: 'Přírůstek spotřeby (kWh)',
-                data: deltaData,
-                backgroundColor: 'rgba(255, 193, 7, 0.8)',
-                borderColor: 'rgba(255, 193, 7, 1)',
-                borderWidth: 1
-            }];
-            charts.delta.options.scales.x.min = undefined;
-            charts.delta.options.scales.x.max = undefined;
-            addMidnightLinesToChart(charts.delta, midnightLines);
-
-            charts.consumption.data.datasets = [{
-                label: 'Kumulativní spotřeba (kWh)',
-                data: data.map(d => ({ x: d.datetime, y: d.kumulativniSpotrebaKwh })),
-                borderColor: '#4caf50',
-                backgroundColor: 'rgba(76, 175, 80, 0.2)',
-                tension: 0.4,
-                fill: true,
-                pointRadius: 2
-            }];
-            charts.consumption.options.scales.x.min = undefined;
-            charts.consumption.options.scales.x.max = undefined;
-            addMidnightLinesToChart(charts.consumption, midnightLines);
-
-            charts.power.data.datasets = [{
-                label: 'Výkon (W)',
-                data: data.map(d => ({ x: d.datetime, y: d.vykonW })),
-                borderColor: '#ff9800',
-                backgroundColor: 'rgba(255, 152, 0, 0.2)',
-                tension: 0.4,
-                fill: true,
-                pointRadius: 2
-            }];
-            charts.power.options.scales.x.min = undefined;
-            charts.power.options.scales.x.max = undefined;
-            addMidnightLinesToChart(charts.power, midnightLines);
-
-            charts.voltage.data.datasets = [{
-                label: 'Napětí (V)',
-                data: data.map(d => ({ x: d.datetime, y: d.napeti })),
-                borderColor: '#2196f3',
-                backgroundColor: 'rgba(33, 150, 243, 0.2)',
-                tension: 0.4,
-                fill: true,
-                pointRadius: 2
-            }];
-            charts.voltage.options.scales.x.min = undefined;
-            charts.voltage.options.scales.x.max = undefined;
-            addMidnightLinesToChart(charts.voltage, midnightLines);
-
-            charts.current.data.datasets = [{
-                label: 'Proud (A)',
-                data: data.map(d => ({ x: d.datetime, y: d.proud })),
-                borderColor: '#9c27b0',
-                backgroundColor: 'rgba(156, 39, 176, 0.2)',
-                tension: 0.4,
-                fill: true,
-                pointRadius: 2
-            }];
-            charts.current.options.scales.x.min = undefined;
-            charts.current.options.scales.x.max = undefined;
-            addMidnightLinesToChart(charts.current, midnightLines);
-
-            Object.values(charts).forEach(chart => chart.update());
-            
-            // Nakreslit preview pro posuvníky
-            ['delta', 'consumption', 'power', 'voltage', 'current'].forEach(name => {
-                drawSliderPreview(name, data);
-            });
-        }
-
-        function updateAggregatedCharts(data) {
-            if (data.length === 0) return;
-
-            const dailyData = {};
-            data.forEach(d => {
-                const dateKey = d.datetime.toLocaleDateString('cs-CZ');
-                if (!dailyData[dateKey]) {
-                    dailyData[dateKey] = 0;
-                }
-                dailyData[dateKey] += d.spotrebaKwh;
-            });
-
-            const dailyLabels = Object.keys(dailyData);
-            const dailyValues = Object.values(dailyData);
-
-            charts.dailyConsumption.data = {
-                labels: dailyLabels,
-                datasets: [{
-                    label: 'Spotřeba (kWh)',
-                    data: dailyValues,
-                    backgroundColor: 'rgba(76, 175, 80, 0.8)',
-                    borderColor: 'rgba(76, 175, 80, 1)',
-                    borderWidth: 1
-                }]
-            };
-            charts.dailyConsumption.update();
-
-            const monthlyData = {};
-            data.forEach(d => {
-                const monthKey = `${d.datetime.getFullYear()}-${String(d.datetime.getMonth() + 1).padStart(2, '0')}`;
-                if (!monthlyData[monthKey]) {
-                    monthlyData[monthKey] = 0;
-                }
-                monthlyData[monthKey] += d.spotrebaKwh;
-            });
-
-            const monthlyLabels = Object.keys(monthlyData).map(key => {
-                const [year, month] = key.split('-');
-                const monthNames = ['Led', 'Úno', 'Bře', 'Dub', 'Kvě', 'Čvn', 'Čvc', 'Srp', 'Zář', 'Říj', 'Lis', 'Pro'];
-                return `${monthNames[parseInt(month) - 1]} ${year}`;
-            });
-            const monthlyValues = Object.values(monthlyData);
-
-            charts.monthlyConsumption.data = {
-                labels: monthlyLabels,
-                datasets: [{
-                    label: 'Spotřeba (kWh)',
-                    data: monthlyValues,
-                    backgroundColor: 'rgba(33, 150, 243, 0.8)',
-                    borderColor: 'rgba(33, 150, 243, 1)',
-                    borderWidth: 1
-                }]
-            };
-            charts.monthlyConsumption.update();
-
-            const yearlyData = {};
-            data.forEach(d => {
-                const year = d.datetime.getFullYear();
-                if (!yearlyData[year]) {
-                    yearlyData[year] = 0;
-                }
-                yearlyData[year] += d.spotrebaKwh;
-            });
-
-            const yearlyLabels = Object.keys(yearlyData);
-            const yearlyValues = Object.values(yearlyData);
-
-            charts.yearlyConsumption.data = {
-                labels: yearlyLabels,
-                datasets: [{
-                    label: 'Spotřeba (kWh)',
-                    data: yearlyValues,
-                    backgroundColor: 'rgba(156, 39, 176, 0.8)',
-                    borderColor: 'rgba(156, 39, 176, 1)',
-                    borderWidth: 1
-                }]
-            };
-            charts.yearlyConsumption.update();
-        }
-
-        function updateStatistics(data) {
-            if (data.length === 0) {
-                document.getElementById('statisticsGrid').innerHTML = '<p style="color: rgba(255,255,255,0.6);">Nedostatek dat</p>';
-                return;
-            }
-
-            const pricePerKwh = parseFloat(document.getElementById('pricePerKwh')?.value || 4.5);
-
-            const powers = data.map(d => d.vykonW);
-            const voltages = data.map(d => d.napeti);
-            const currents = data.map(d => d.proud);
-            const consumptions = data.map(d => d.spotrebaKwh);
-
-            const totalConsumption = consumptions.reduce((a, b) => a + b, 0);
-            const avgPower = powers.reduce((a, b) => a + b, 0) / powers.length;
-            const maxPower = Math.max(...powers);
-            const minPower = Math.min(...powers);
-            const maxPowerTime = data[powers.indexOf(maxPower)].datetime;
-            const minPowerTime = data[powers.indexOf(minPower)].datetime;
-
-            const hourlyConsumption = Array(24).fill(0);
-            const hourlyCounts = Array(24).fill(0);
-            data.forEach(d => {
-                const hour = d.datetime.getHours();
-                hourlyConsumption[hour] += d.vykonW;
-                hourlyCounts[hour]++;
-            });
-            const avgHourlyPower = hourlyConsumption.map((sum, i) => hourlyCounts[i] > 0 ? sum / hourlyCounts[i] : 0);
-            const peakHour = avgHourlyPower.indexOf(Math.max(...avgHourlyPower));
-            const offPeakHour = avgHourlyPower.indexOf(Math.min(...avgHourlyPower.filter(p => p > 0)));
-
-            const weekdayConsumption = Array(7).fill(0);
-            const weekdayCounts = Array(7).fill(0);
-            data.forEach(d => {
-                const day = d.datetime.getDay();
-                weekdayConsumption[day] += d.vykonW;
-                weekdayCounts[day]++;
-            });
-            const avgWeekdayPower = weekdayConsumption.map((sum, i) => weekdayCounts[i] > 0 ? sum / weekdayCounts[i] : 0);
-            const peakWeekday = avgWeekdayPower.indexOf(Math.max(...avgWeekdayPower));
-            const weekdayNames = ['Neděle', 'Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota'];
-
-            const timeSpan = (data[data.length - 1].datetime - data[0].datetime) / (1000 * 60 * 60 * 24);
-            const avgDailyConsumption = totalConsumption / timeSpan;
-
-            const avgVoltage = voltages.reduce((a, b) => a + b, 0) / voltages.length;
-            const avgCurrent = currents.reduce((a, b) => a + b, 0) / currents.length;
-            const powerFactor = avgPower / (avgVoltage * avgCurrent);
-
-            const totalCost = totalConsumption * pricePerKwh;
-            const avgDailyCost = totalCost / timeSpan;
-            const projectedMonthlyCost = avgDailyCost * 30;
-            const projectedYearlyCost = avgDailyCost * 365;
-
-            document.getElementById('statisticsGrid').innerHTML = `
-                <div class="stat-card">
-                    <div class="stat-icon">📊</div>
-                    <div class="stat-label">OBDOBÍ</div>
-                    <div class="stat-value">${timeSpan.toFixed(1)}</div>
-                    <div class="stat-meta">dnů monitorování</div>
-                    <div class="stat-meta" style="margin-top: 10px;">
-                        Od: ${formatDateTime(data[0].datetime)}<br>
-                        Do: ${formatDateTime(data[data.length - 1].datetime)}
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">⚡</div>
-                    <div class="stat-label">PRŮMĚRNÝ VÝKON</div>
-                    <div class="stat-value">${avgPower.toFixed(0)} W</div>
-                    <div class="stat-meta">
-                        Maximum: ${maxPower.toFixed(0)} W<br>
-                        <small>${formatDateTime(maxPowerTime)}</small><br>
-                        Minimum: ${minPower.toFixed(0)} W<br>
-                        <small>${formatDateTime(minPowerTime)}</small>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">🕐</div>
-                    <div class="stat-label">ŠPIČKA DNE</div>
-                    <div class="stat-value">${peakHour}:00</div>
-                    <div class="stat-meta">
-                        Průměrný výkon: ${avgHourlyPower[peakHour].toFixed(0)} W<br>
-                        Nejnižší: ${offPeakHour}:00 (${avgHourlyPower[offPeakHour].toFixed(0)} W)
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">📅</div>
-                    <div class="stat-label">NEJVYŠŠÍ DEN</div>
-                    <div class="stat-value">${weekdayNames[peakWeekday]}</div>
-                    <div class="stat-meta">
-                        Průměrný výkon: ${avgWeekdayPower[peakWeekday].toFixed(0)} W
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">📈</div>
-                    <div class="stat-label">DENNÍ SPOTŘEBA</div>
-                    <div class="stat-value">${avgDailyConsumption.toFixed(2)}</div>
-                    <div class="stat-meta">kWh/den (průměr)</div>
-                    <div class="cost-display">
-                        <div style="font-size: 0.9em; opacity: 0.8;">Denní náklady</div>
-                        <div class="cost-value">${avgDailyCost.toFixed(2)} Kč</div>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">💰</div>
-                    <div class="stat-label">PROJEKCE NÁKLADŮ</div>
-                    <div class="stat-value">${projectedMonthlyCost.toFixed(0)}</div>
-                    <div class="stat-meta">Kč/měsíc (odhad)</div>
-                    <div class="stat-meta" style="margin-top: 10px;">
-                        Roční odhad: ${projectedYearlyCost.toFixed(0)} Kč
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">🔌</div>
-                    <div class="stat-label">ÚČINÍK</div>
-                    <div class="stat-value">${powerFactor.toFixed(3)}</div>
-                    <div class="stat-meta">
-                        Power Factor (cos φ)<br>
-                        <small>${powerFactor > 0.95 ? 'Výborný' : powerFactor > 0.85 ? 'Dobrý' : 'Ke zlepšení'}</small>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">📊</div>
-                    <div class="stat-label">MĚŘENÍ</div>
-                    <div class="stat-value">${data.length}</div>
-                    <div class="stat-meta">
-                        Celkový počet záznamů<br>
-                        Průměrný interval: ${((timeSpan * 24 * 60) / data.length).toFixed(1)} min
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">⚙️</div>
-                    <div class="stat-label">STABILITA NAPĚTÍ</div>
-                    <div class="stat-value">${avgVoltage.toFixed(1)} V</div>
-                    <div class="stat-meta">
-                        Max: ${Math.max(...voltages).toFixed(1)} V<br>
-                        Min: ${Math.min(...voltages).toFixed(1)} V<br>
-                        Rozptyl: ${(Math.max(...voltages) - Math.min(...voltages)).toFixed(1)} V
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">🌊</div>
-                    <div class="stat-label">PRŮMĚRNÝ PROUD</div>
-                    <div class="stat-value">${avgCurrent.toFixed(2)} A</div>
-                    <div class="stat-meta">
-                        Maximum: ${Math.max(...currents).toFixed(2)} A<br>
-                        Minimum: ${Math.min(...currents).toFixed(2)} A
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">💡</div>
-                    <div class="stat-label">EFEKTIVITA</div>
-                    <div class="stat-value">${(avgPower / 1000 * 24).toFixed(1)}</div>
-                    <div class="stat-meta">
-                        kWh/den při trvalém průměrném výkonu<br>
-                        <small>Skutečná: ${avgDailyConsumption.toFixed(2)} kWh/den</small>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon">🎯</div>
-                    <div class="stat-label">CELKEM ZA OBDOBÍ</div>
-                    <div class="stat-value">${totalConsumption.toFixed(2)}</div>
-                    <div class="stat-meta">kWh</div>
-                    <div class="cost-display">
-                        <div style="font-size: 0.9em; opacity: 0.8;">Celkové náklady</div>
-                        <div class="cost-value">${totalCost.toFixed(2)} Kč</div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function getColorForPower(power, minPower, maxPower) {
-            const range = maxPower - minPower || 1;
-            const ratio = Math.max(0, Math.min(1, (power - minPower) / range));
-            
-            let r, g, b;
-            
-            if (ratio < 0.2) {
-                const t = ratio / 0.2;
-                r = 255;
-                g = 255;
-                b = Math.round(255 - t * 55);
-            } else if (ratio < 0.4) {
-                const t = (ratio - 0.2) / 0.2;
-                r = 255;
-                g = 255;
-                b = Math.round(200 - t * 200);
-            } else if (ratio < 0.6) {
-                const t = (ratio - 0.4) / 0.2;
-                r = 255;
-                g = Math.round(255 - t * 90);
-                b = 0;
-            } else if (ratio < 0.8) {
-                const t = (ratio - 0.6) / 0.2;
-                r = 255;
-                g = Math.round(165 - t * 100);
-                b = 0;
-            } else {
-                const t = (ratio - 0.8) / 0.2;
-                r = Math.round(255 - t * 220);
-                g = Math.round(65 - t * 65);
-                b = 0;
-            }
-            
-            return `rgb(${r}, ${g}, ${b})`;
-        }
-
-        function updateHeatmap(data) {
-            const currentYear = new Date().getFullYear();
-            const daysInYear = isLeapYear(currentYear) ? 366 : 365;
-            
-            const matrix = Array(daysInYear).fill(null).map(() => Array(24).fill(null).map(() => []));
-            
-            data.forEach(d => {
-                if (d.datetime.getFullYear() !== currentYear) return;
-                
-                const dayOfYear = getDayOfYear(d.datetime);
-                const hour = d.datetime.getHours();
-                
-                if (dayOfYear >= 0 && dayOfYear < daysInYear && hour >= 0 && hour < 24) {
-                    matrix[dayOfYear][hour].push(d.vykonW);
-                }
-            });
-
-            const avgMatrix = matrix.map(day => 
-                day.map(hours => 
-                    hours.length > 0 ? hours.reduce((a, b) => a + b, 0) / hours.length : null
-                )
-            );
-
-            const allPowers = avgMatrix.flat().filter(p => p !== null);
-            if (allPowers.length === 0) {
-                document.getElementById('heatmapGrid').innerHTML = '<p style="color: rgba(255,255,255,0.6); padding: 20px;">Nedostatek dat pro zobrazení heatmapy</p>';
-                return;
-            }
-
-            const minPower = Math.min(...allPowers);
-            const maxPower = Math.max(...allPowers);
-
-            document.getElementById('heatmapMin').textContent = minPower.toFixed(0) + 'W';
-            document.getElementById('heatmapMax').textContent = maxPower.toFixed(0) + 'W';
-
-            const heatmapDiv = document.getElementById('heatmapGrid');
-            heatmapDiv.innerHTML = '';
-
-            const gridContainer = document.createElement('div');
-            gridContainer.className = 'heatmap-grid';
-
-            const yLabels = document.createElement('div');
-            yLabels.className = 'heatmap-y-labels';
-            
-            for (let hour = 0; hour < 24; hour++) {
-                const label = document.createElement('div');
-                label.className = 'heatmap-y-label';
-                label.textContent = hour + ':00';
-                yLabels.appendChild(label);
-            }
-            gridContainer.appendChild(yLabels);
-
-            const contentWrapper = document.createElement('div');
-            contentWrapper.className = 'heatmap-content-wrapper';
-
-            const xLabels = document.createElement('div');
-            xLabels.className = 'heatmap-x-labels';
-            
-            const monthNames = ['Led', 'Úno', 'Bře', 'Dub', 'Kvě', 'Čvn', 'Čvc', 'Srp', 'Zář', 'Říj', 'Lis', 'Pro'];
-            const daysInMonth = [31, isLeapYear(currentYear) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-
-            let cumulativeDays = 0;
-            monthNames.forEach((month, idx) => {
-                const monthLabel = document.createElement('div');
-                monthLabel.className = 'heatmap-month-label';
-                monthLabel.textContent = month;
-                const position = ((cumulativeDays + daysInMonth[idx] / 2) / daysInYear) * 100;
-                monthLabel.style.left = position + '%';
-                xLabels.appendChild(monthLabel);
-                cumulativeDays += daysInMonth[idx];
-            });
-            contentWrapper.appendChild(xLabels);
-
-            const dataDiv = document.createElement('div');
-            dataDiv.className = 'heatmap-data';
-
-            avgMatrix.forEach((dayData, dayIndex) => {
-                const dayColumn = document.createElement('div');
-                dayColumn.className = 'heatmap-day-column';
-
-                dayData.forEach((power, hour) => {
-                    const cell = document.createElement('div');
-                    cell.className = 'heatmap-hour-cell';
-
-                    if (power !== null) {
-                        cell.style.background = getColorForPower(power, minPower, maxPower);
-                        
-                        const date = getDateFromDayOfYear(dayIndex, currentYear);
-                        cell.title = `${date.getDate()}. ${date.getMonth() + 1}. ${currentYear} ${hour}:00 - ${power.toFixed(0)}W`;
-                    } else {
-                        cell.style.background = 'rgba(255,255,255,0.05)';
-                    }
-
-                    dayColumn.appendChild(cell);
-                });
-
-                dataDiv.appendChild(dayColumn);
-            });
-
-            contentWrapper.appendChild(dataDiv);
-            gridContainer.appendChild(contentWrapper);
-            heatmapDiv.appendChild(gridContainer);
-        }
-
-        function isLeapYear(year) {
-            return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
-        }
-
-        function getDayOfYear(date) {
-            const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-            const start = new Date(Date.UTC(date.getFullYear(), 0, 0));
-            const diff = utcDate - start;
-            const oneDay = 1000 * 60 * 60 * 24;
-            return Math.floor(diff / oneDay) - 1;
-        }
-
-        function getDateFromDayOfYear(dayOfYear, year) {
-            const date = new Date(year, 0, 1);
-            date.setDate(date.getDate() + dayOfYear);
-            return date;
-        }
-    </script>
-</body>
-</html>
-
-        function updateStats(data) {
-            const pricePerKwh = parseFloat(document.getElementById('pricePerKwh')?.value || 4.5);
-            
-            const stats = {
-                vykon: calcStatsWithTime(data.map(d => ({ value: d.vykonW, time: d.datetime }))),
-                napeti: calcStatsWithTime(data.map(d => ({ value: d.napeti, time: d.datetime }))),
-                proud: calcStatsWithTime(data.map(d => ({ value: d.proud, time: d.datetime }))),
-                spotreba: {
-                    total: data.length > 0 ? data[data.length - 1].kumulativniSpotrebaKwh - data[0].kumulativniSpotrebaKwh : 0,
-                    current: data.length > 0 ? data[data.length - 1].kumulativniSpotrebaKwh : 0
-                }
-            };
-
-            const totalCost = stats.spotreba.total * pricePerKwh;
-
-            document.getElementById('statsGrid').innerHTML = `
-                <div class="stat-card">
-                    <div class="stat-icon">⚡</div>
-                    <div class="stat-label">OKAMŽITÝ VÝKON</div>
-                    <div class="stat-value">${stats.vykon.current.value.toFixed(0)} W</div>
-                    <div class="stat-timestamp">📅 ${formatDateTime(stats.vykon.current.time)}</div>
-                    <div class="stat-trend ${stats.vykon.trend >= 0 ? 'up' : 'down'}">
-                        ${stats.vykon.trend >= 0 ? '↑' : '↓'} ${Math.abs(stats.vykon.trend).toFixed(0)} W od předchozího
-                    </div>
-                    <div class="stat-meta">
-                        Max: ${stats.vykon.max.value.toFixed(0)} W<br>
-                        <small>${formatDateTime(stats.vykon.max.time)}</small><br>
-                        Průměr: ${stats.vykon.avg.toFixed(0)} W
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">📊</div>
-                    <div class="stat-label">CELKOVÁ SPOTŘEBA</div>
-                    <div class="stat-value">${stats.spotreba.total.toFixed(2)} kWh</div>
-                    <div class="stat-timestamp">Za zvolené období</div>
-                    <div class="cost-display">
-                        <div style="font-size: 0.9em; opacity: 0.8;">Náklady</div>
-                        <div class="cost-value">${totalCost.toFixed(2)} Kč</div>
-                        <div style="font-size: 0.8em; opacity: 0.7;">při ${pricePerKwh} Kč/kWh</div>
-                    </div>
-                    <div class="stat-meta" style="margin-top: 10px;">
-                        Kumulativní: ${stats.spotreba.current.toFixed(2)} kWh
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">🔌</div>
-                    <div class="stat-label">NAPĚTÍ</div>
-                    <div class="stat-value">${stats.napeti.current.value.toFixed(1)} V</div>
-                    <div class="stat-timestamp">📅 ${formatDateTime(stats.napeti.current.time)}</div>
-                    <div class="stat-trend ${stats.napeti.trend >= 0 ? 'up' : 'down'}">
-                        ${stats.napeti.trend >= 0 ? '↑' : '↓'} ${Math.abs(stats.napeti.trend).toFixed(1)} V
-                    </div>
-                    <div class="stat-meta">
-                        Min: ${stats.napeti.min.value.toFixed(1)} V<br>
-                        <small>${formatDateTime(stats.napeti.min.time)}</small><br>
-                        Max: ${stats.napeti.max.value.toFixed(1)} V<br>
-                        <small>${formatDateTime(stats.napeti.max.time)}</small>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">🌊</div>
-                    <div class="stat-label">PROUD</div>
-                    <div class="stat-value">${stats.proud.current.value.toFixed(2)} A</div>
-                    <div class="stat-timestamp">📅 ${formatDateTime(stats.proud.current.time)}</div>
-                    <div class="stat-trend ${stats.proud.trend >= 0 ? 'up' : 'down'}">
-                        ${stats.proud.trend >= 0 ? '↑' : '↓'} ${Math.abs(stats.proud.trend).toFixed(2)} A
-                    </div>
-                    <div class="stat-meta">
-                        Max: ${stats.proud.max.value.toFixed(2)} A<br>
-                        <small>${formatDateTime(stats.proud.max.time)}</small><br>
-                        Průměr: ${stats.proud.avg.toFixed(2)} A
-                    </div>
-                </div>
-            `;
-        }
-
-        function calcStatsWithTime(items) {
-            if (items.length === 0) return { 
-                current: {value: 0, time: new Date()}, 
-                min: {value: 0, time: new Date()}, 
-                max: {value: 0, time: new Date()}, 
-                avg: 0, 
-                trend: 0 
-            };
-            
-            const values = items.map(i => i.value);
-            const current = items[items.length - 1];
-            const previous = items[Math.max(0, items.length - 10)];
-            
-            const minValue = Math.min(...values);
-            const maxValue = Math.max(...values);
-            const minItem = items.find(i => i.value === minValue);
-            const maxItem = items.find(i => i.value === maxValue);
-            
-            return {
-                current,
-                min: minItem,
-                max: maxItem,
-                avg: values.reduce((a, b) => a + b, 0) / values.length,
-                trend: current.value - previous.value
-            };
-        }
-
-        function initializeCharts() {
-            const zoomOptions = {
-                zoom: {
-                    wheel: { enabled: true, speed: 0.1 },
-                    pinch: { enabled: true },
-                    mode: 'x'
-                },
-                pan: {
-                    enabled: true,
-                    mode: 'x',
-                    modifierKey: null
-                },
-                limits: {
-                    x: {min: 'original', max: 'original'}
-                }
-            };
-
-            const commonOptions = {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { 
-                        display: true,
-                        labels: { color: 'rgba(255,255,255,0.8)' }
-                    },
-                    zoom: zoomOptions,
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        backgroundColor: 'rgba(0,0,0,0.8)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff'
-                    },
-                    annotation: { annotations: {} }
-                },
-                scales: {
-                    x: {
-                        type: 'time',
-                        time: { 
-                            unit: 'hour',
-                            displayFormats: { 
-                                hour: 'HH:mm',
-                                day: 'dd.MM'
-                            },
-                            tooltipFormat: 'dd.MM.yyyy HH:mm'
-                        },
-                        ticks: { color: 'rgba(255,255,255,0.7)' },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
-                    }
-                },
-                interaction: { mode: 'index', intersect: false }
-            };
-
-            charts.delta = new Chart(document.getElementById('deltaChart'), {
-                type: 'bar',
-                data: { datasets: [] },
-                options: {
-                    ...commonOptions,
-                    scales: {
-                        ...commonOptions.scales,
-                        y: {
-                            title: { display: true, text: 'kWh', color: 'rgba(255,255,255,0.8)' },
-                            ticks: { color: 'rgba(255,255,255,0.7)' },
-                            grid: { color: 'rgba(255,255,255,0.1)' }
-                        }
-                    },
-                    barPercentage: 1.0,
-                    categoryPercentage: 1.0
-                }
-            });
-
-            charts.consumption = new Chart(document.getElementById('consumptionChart'), {
-                type: 'line',
-                data: { datasets: [] },
-                options: {
-                    ...commonOptions,
-                    scales: {
-                        ...commonOptions.scales,
-                        y: {
-                            title: { display: true, text: 'kWh', color: 'rgba(255,255,255,0.8)' },
-                            ticks: { color: 'rgba(255,255,255,0.7)' },
-                            grid: { color: 'rgba(255,255,255,0.1)' }
-                        }
-                    }
-                }
-            });
-
-            charts.power = new Chart(document.getElementById('powerChart'), {
-                type: 'line',
-                data: { datasets: [] },
-                options: {
-                    ...commonOptions,
-                    scales: {
-                        ...commonOptions.scales,
-                        y: {
-                            title: { display: true, text: 'W', color: 'rgba(255,255,255,0.8)' },
-                            ticks: { color: 'rgba(255,255,255,0.7)' },
-                            grid: { color: 'rgba(255,255,255,0.1)' }
-                        }
-                    }
-                }
-            });
-
-            charts.voltage = new Chart(document.getElementById('voltageChart'), {
-                type: 'line',
-                data: { datasets: [] },
-                options: {
-                    ...commonOptions,
-                    scales: {
-                        ...commonOptions.scales,
-                        y: {
-                            title: { display: true, text: 'V', color: 'rgba(255,255,255,0.8)' },
-                            ticks: { color: 'rgba(255,255,255,0.7)' },
-                            grid: { color: 'rgba(255,255,255,0.1)' }
-                        }
-                    }
-                }
-            });
-
-            charts.current = new Chart(document.getElementById('currentChart'), {
-                type: 'line',
-                data: { datasets: [] },
-                options: {
-                    ...commonOptions,
-                    scales: {
-                        ...commonOptions.scales,
-                        y: {
-                            title: { display: true, text: 'A', color: 'rgba(255,255,255,0.8)' },
-                            ticks: { color: 'rgba(255,255,255,0.7)' },
-                            grid: { color: 'rgba(255,255,255,0.1)' }
-                        }
-                    }
-                }
-            });
-
-            const aggregatedOptions = {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: 'rgba(0,0,0,0.8)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff'
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: { color: 'rgba(255,255,255,0.7)' },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
-                    },
-                    y: {
-                        title: { display: true, text: 'kWh', color: 'rgba(255,255,255,0.8)' },
-                        ticks: { color: 'rgba(255,255,255,0.7)' },
-                        grid: { color: 'rgba(255,255,255,0.1)' }
-                    }
-                }
-            };
-
-            charts.dailyConsumption = new Chart(document.getElementById('dailyConsumptionChart'), {
-                type: 'bar',
-                data: { datasets: [] },
-                options: aggregatedOptions
-            });
-
-            charts.monthlyConsumption = new Chart(document.getElementById('monthlyConsumptionChart'), {
-                type: 'bar',
-                data: { datasets: [] },
-                options: aggregatedOptions
-            });
-
-            charts.yearlyConsumption = new Chart(document.getElementById('yearlyConsumptionChart'), {
-                type: 'bar',
-                data: { datasets: [] },
-                options: aggregatedOptions
-            });
-        }
-
-        // Inicializace posuvníků
-        function initializeSliders() {
-            const sliderNames = ['delta', 'consumption', 'power', 'voltage', 'current'];
-            
-            sliderNames.forEach(name => {
-                const sliderWindow = document.getElementById(`${name}SliderWindow`);
-                const slider = document.getElementById(`${name}Slider`);
-                
-                if (!sliderWindow || !slider) return;
-                
-                sliders[name] = {
-                    window: sliderWindow,
-                    slider: slider,
-                    isDragging: false,
-                    isResizing: false,
-                    resizeHandle: null,
-                    startX: 0,
-                    startLeft: 0,
-                    startWidth: 0,
-                    startRight: 0
-                };
-
-                // Inicializace pozice
-                sliderWindow.style.left = '0%';
-                sliderWindow.style.width = '100%';
-                sliderWindow.style.right = '';
-
-                // Drag celého okna
-                sliderWindow.addEventListener('mousedown', (e) => {
-                    if (e.target.classList.contains('chart-slider-handle')) return;
-                    handleSliderMouseDown(e, name);
-                });
-                
-                const leftHandle = sliderWindow.querySelector('.chart-slider-handle.left');
-                const rightHandle = sliderWindow.querySelector('.chart-slider-handle.right');
-
-                if (leftHandle) {
-                    leftHandle.addEventListener('mousedown', (e) => handleResizeStart(e, name, 'left'));
-                }
-                
-                if (rightHandle) {
-                    rightHandle.addEventListener('mousedown', (e) => handleResizeStart(e, name, 'right'));
-                }
-            });
-
-            document.addEventListener('mousemove', handleSliderMouseMove);
-            document.addEventListener('mouseup', handleSliderMouseUp);
-        }
-
-        function handleSliderMouseDown(e, name) {
-            const slider = sliders[name];
-            if (!slider) return;
-            
-            slider.isDragging = true;
-            slider.startX = e.clientX;
-            
-            const parentRect = slider.slider.getBoundingClientRect();
-            const windowRect = slider.window.getBoundingClientRect();
-            
-            slider.startLeft = ((windowRect.left - parentRect.left) / parentRect.width) * 100;
-            slider.startWidth = (windowRect.width / parentRect.width) * 100;
-            
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        function handleResizeStart(e, name, handle) {
-            const slider = sliders[name];
-            if (!slider) return;
-            
-            slider.isResizing = true;
-            slider.resizeHandle = handle;
-            slider.startX = e.clientX;
-            
-            const parentRect = slider.slider.getBoundingClientRect();
-            const windowRect = slider.window.getBoundingClientRect();
-            
-            slider.startLeft = ((windowRect.left - parentRect.left) / parentRect.width) * 100;
-            slider.startWidth = (windowRect.width / parentRect.width) * 100;
-            slider.startRight = slider.startLeft + slider.startWidth;
-            
-            e.stopPropagation();
-            e.preventDefault();
-        }
-
-        function handleSliderMouseMove(e) {
-            let needsUpdate = false;
-            let updateName = null;
-            
-            Object.keys(sliders).forEach(name => {
-                const slider = sliders[name];
-                if (!slider.isDragging && !slider.isResizing) return;
-
-                const parentRect = slider.slider.getBoundingClientRect();
-                const deltaX = e.clientX - slider.startX;
-                const deltaPercent = (deltaX / parentRect.width) * 100;
-
-                if (slider.isDragging) {
-                    let newLeft = slider.startLeft + deltaPercent;
-                    newLeft = Math.max(0, Math.min(100 - slider.startWidth, newLeft));
-                    
-                    slider.window.style.left = newLeft.toFixed(2) + '%';
-                    slider.window.style.width = slider.startWidth.toFixed(2) + '%';
-                    slider.window.style.right = '';
-                    
-                    needsUpdate = true;
-                    updateName = name;
-                } 
-                else if (slider.isResizing) {
-                    if (slider.resizeHandle === 'left') {
-                        let newLeft = slider.startLeft + deltaPercent;
-                        let newWidth = slider.startWidth - deltaPercent;
-                        const minWidth = 5;
-                        
-                        if (newWidth < minWidth) {
-                            newWidth = minWidth;
-                            newLeft = slider.startRight - minWidth;
-                        }
-                        
-                        newLeft = Math.max(0, newLeft);
-                        
-                        if (newLeft + newWidth > 100) {
-                            newWidth = 100 - newLeft;
-                        }
-                        
-                        slider.window.style.left = newLeft.toFixed(2) + '%';
-                        slider.window.style.width = newWidth.toFixed(2) + '%';
-                        slider.window.style.right = '';
-                    } 
-                    else if (slider.resizeHandle === 'right') {
-                        let newWidth = slider.startWidth + deltaPercent;
-                        const minWidth = 5;
-                        newWidth = Math.max(minWidth, newWidth);
-                        const maxWidth = 100 - slider.startLeft;
-                        newWidth = Math.min(maxWidth, newWidth);
-                        
-                        slider.window.style.width = newWidth.toFixed(2) + '%';
-                        slider.window.style.right = '';
-                    }
-                    
-                    needsUpdate = true;
-                    updateName = name;
-                }
-            });
-            
-            if (needsUpdate && updateName) {
-                updateChartFromSlider(updateName);
-            }
-        }
-
-        function handleSliderMouseUp() {
-            Object.keys(sliders).forEach(name => {
-                sliders[name].isDragging = false;
-                sliders[name].isResizing = false;
-                sliders[name].resizeHandle = null;
-            });
-        }
-
-        function updateChartFromSlider(name) {
-            if (!charts[name] || !filteredData.length) return;
-
-            const slider = sliders[name];
-            const parentRect = slider.slider.getBoundingClientRect();
-            const windowRect = slider.window.getBoundingClientRect();
-
-            const leftPercent = ((windowRect.left - parentRect.left) / parentRect.width) * 100;
-            const widthPercent = (windowRect.width / parentRect.width) * 100;
-            const rightPercent = leftPercent + widthPercent;
-
-            const startIndex = Math.max(0, Math.floor((leftPercent / 100) * filteredData.length));
-            const endIndex = Math.min(filteredData.length, Math.ceil((rightPercent / 100) * filteredData.length));
-
-            const sliderData = filteredData.slice(startIndex, endIndex);
-
-            if (sliderData.length === 0) return;
-
-            const startDate = sliderData[0].datetime;
-            const endDate = sliderData[sliderData.length - 1].datetime;
-
-            const startLabel = document.getElementById(`${name}SliderStart`);
-            const endLabel = document.getElementById(`${name}SliderEnd`);
-            
-            if (startLabel) {
-                startLabel.textContent = startDate.toLocaleString('cs-CZ', { 
-                    day: '2-digit', 
-                    month: '2-digit', 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                });
-            }
-            
-            if (endLabel) {
-                endLabel.textContent = endDate.toLocaleString('cs-CZ', { 
-                    day: '2-digit', 
-                    month: '2-digit', 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                });
-            }
-
-            updateSingleChart(name, sliderData);
-        }
-
-        function updateSingleChart(name, data) {
-            if (name === 'delta' && charts.delta) {
-                const deltaData = data.filter(d => d.spotrebaKwh > 0).map(d => ({ x: d.datetime, y: d.spotrebaKwh }));
-                charts.delta.data.datasets[0].data = deltaData;
-                
-                if (data.length > 0) {
-                    charts.delta.options.scales.x.min = data[0].datetime;
-                    charts.delta.options.scales.x.max = data[data.length - 1].datetime;
-                }
-                
-                charts.delta.update('none');
-            } else if (name === 'consumption' && charts.consumption) {
-                charts.consumption.data.datasets[0].data = data.map(d => ({ x: d.datetime, y: d.kumulativniSpotrebaKwh }));
-                
-                if (data.length > 0) {
-                    charts.consumption.options.scales.x.min = data[0].datetime;
-                    charts.consumption.options.scales.x.max = data[data.length - 1].datetime;
-                }
-                
-                charts.consumption.update('none');
-            } else if (name === 'power' && charts.power) {
-                charts.power.data.datasets[0].data = data.map(d => ({ x: d.datetime, y: d.vykonW }));
-                
-                if (data.length > 0) {
-                    charts.power.options.scales.x.min = data[0].datetime;
-                    charts.power.options.scales.x.max = data[data.length - 1].datetime;
-                }
-                
-                charts.power.update('none');
-            } else if (name === 'voltage' && charts.voltage) {
-                charts.voltage.data.datasets[0].data = data.map(d => ({ x: d.datetime, y: d.napeti }));
-                
-                if (data.length > 0) {
-                    charts.voltage.options.scales.x.min = data[0].datetime;
-                    charts.voltage.options.scales.x.max = data[data.length - 1].datetime;
-                }
-                
-                charts.voltage.update('none');
-            } else if (name === 'current' && charts.current) {
-                charts.current.data.datasets[0].data = data.map(d => ({ x: d.datetime, y: d.proud }));
-                
-                if (data.length > 0) {
-                    charts.current.options.scales.x.min = data[0].datetime;
-                    charts.current.options.scales.x.max = data[data.length - 1].datetime;
-                }
-                
-                charts.current.update('none');
-            }
-        }
-
-        function drawSliderPreview(name, data) {
-            const canvas = document.getElementById(`${name}SliderPreview`);
-            if (!canvas || !data.length) return;
-
-            const ctx = canvas.getContext('2d');
-            const width = canvas.width = canvas.offsetWidth * 2;
-            const height = canvas.height = canvas.offsetHeight * 2;
-            
-            ctx.clearRect(0, 0, width, height);
-
-            let values;
-            if (name === 'delta') values = data.filter(d => d.spotrebaKwh > 0).map(d => d.spotrebaKwh);
-            else if (name === 'consumption') values = data.map(d => d.kumulativniSpotrebaKwh);
-            else if (name === 'power') values = data.map(d => d.vykonW);
-            else if (name === 'voltage') values = data.map(d => d.napeti);
-            else if (name === 'current') values = data.map(d => d.proud);
-
-            if (!values || values.length === 0) return;
-
-            const min = Math.min(...values);
-            const max = Math.max(...values);
-            const range = max - min || 1;
-
-            ctx.beginPath();
-            ctx.strokeStyle = '#667eea';
-            ctx.lineWidth = 2;
-
-            values.forEach((val, i) => {
-                const x = (i / (values.length - 1)) * width;
-                const y = height - ((val - min) / range) * height * 0.8 - height * 0.1;
-                
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            });
-
-            ctx.stroke();
-        }
-
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
@@ -1430,13 +313,13 @@
             margin-top: 15px;
             padding: 15px;
             background: rgba(255, 255, 255, 0.03);
-            border-radius: 8px;
+            border-radius: 10px;
         }
 
         .chart-slider {
             position: relative;
             height: 60px;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
             border-radius: 6px;
             overflow: visible;
             cursor: pointer;
@@ -1488,7 +371,7 @@
             justify-content: space-between;
             margin-top: 5px;
             font-size: 0.8em;
-            color: rgba(255, 255, 255, 0.7);
+            color: rgba(255, 255, 255, 0.6);
         }
 
         .full-width {
@@ -1902,3 +785,1429 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Stránka 2: Agregovaná spotřeba -->
+        <div id="page-aggregated" class="page-section">
+            <h2 class="page-title">📈 Agregovaná spotřeba</h2>
+            <p style="color: rgba(255,255,255,0.6); text-align: center; margin-bottom: 30px;">Celková spotřeba za jednotlivá období</p>
+            
+            <div class="chart-grid">
+                <div class="chart-container">
+                    <h2>📅 Spotřeba po dnech</h2>
+                    <div class="chart-wrapper">
+                        <canvas id="dailyConsumptionChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <h2>📆 Spotřeba po měsících</h2>
+                    <div class="chart-wrapper">
+                        <canvas id="monthlyConsumptionChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container full-width">
+                    <h2>📊 Spotřeba po rocích</h2>
+                    <div class="chart-wrapper">
+                        <canvas id="yearlyConsumptionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stránka 3: Detailní statistiky -->
+        <div id="page-statistics" class="page-section">
+            <h2 class="page-title">📉 Detailní statistiky</h2>
+            <p style="color: rgba(255,255,255,0.6); text-align: center; margin-bottom: 30px;">Podrobné statistické údaje za vybrané období</p>
+            <div id="statisticsGrid" class="stats-grid"></div>
+        </div>
+
+        <!-- Stránka 4: Heatmapa -->
+        <div id="page-heatmap" class="page-section">
+            <h2 class="page-title">🔥 Roční heatmapa spotřeby</h2>
+            <p style="color: rgba(255,255,255,0.6); text-align: center; margin-bottom: 30px;">Průměrný odběr podle dne v roce a hodiny</p>
+            
+            <div class="heatmap-container">
+                <div class="heatmap-wrapper">
+                    <div id="heatmapGrid"></div>
+                </div>
+                <div class="heatmap-legend">
+                    <span style="font-size: 0.85em; color: rgba(255,255,255,0.8); font-weight: 600;">Výkon:</span>
+                    <span style="font-size: 0.85em; color: rgba(255,255,255,0.7);" id="heatmapMin">0W</span>
+                    <div class="heatmap-legend-gradient"></div>
+                    <span style="font-size: 0.85em; color: rgba(255,255,255,0.7);" id="heatmapMax">3000W</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyMBjZ_y8qTtpexHYVroyt1xe50e4S0qg3OrD5K01dlKHeEiiYBGSlT5cRp1xixvNDoZQ/exec';
+        const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000;
+
+        let rawData = [];
+        let filteredData = [];
+        let charts = {};
+        let sliders = {};
+        let autoRefreshTimer = null;
+        let currentPage = 'overview';
+
+        function switchPage(pageName) {
+            currentPage = pageName;
+            
+            document.querySelectorAll('.page-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            document.getElementById('page-' + pageName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function formatDateTime(date) {
+            return date.toLocaleString('cs-CZ', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', function() {
+            updateCurrentTime();
+            setInterval(updateCurrentTime, 1000);
+            
+            loadData();
+            autoRefreshTimer = setInterval(loadData, AUTO_REFRESH_INTERVAL);
+        });
+
+        function updateCurrentTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('cs-CZ', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+            const dateString = now.toLocaleDateString('cs-CZ', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            
+            const timeElement = document.getElementById('currentTime');
+            if (timeElement) {
+                timeElement.textContent = `${dateString} ${timeString}`;
+            }
+        }
+
+        function resetZoom(chartName) {
+            if (charts[chartName]) {
+                charts[chartName].resetZoom();
+            }
+        }
+
+        function zoomIn(chartName) {
+            if (charts[chartName]) {
+                charts[chartName].zoom(1.1);
+            }
+        }
+
+        function zoomOut(chartName) {
+            if (charts[chartName]) {
+                charts[chartName].zoom(0.9);
+            }
+        }
+
+        async function loadData() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('success').style.display = 'none';
+
+            try {
+                const response = await fetch(GOOGLE_SHEETS_URL, {
+                    method: 'GET',
+                    redirect: 'follow'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const csvText = await response.text();
+                parseGoogleSheetsData(csvText);
+                
+                document.getElementById('lastUpdate').textContent = 
+                    `Poslední aktualizace: ${formatDateTime(new Date())} | Načteno ${rawData.length} záznamů`;
+                
+                document.getElementById('success').textContent = 
+                    `✅ Úspěšně načteno ${rawData.length} měření!`;
+                document.getElementById('success').style.display = 'block';
+                setTimeout(() => {
+                    document.getElementById('success').style.display = 'none';
+                }, 5000);
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        function parseGoogleSheetsData(csvText) {
+            try {
+                const lines = csvText.trim().split('\n');
+                
+                if (lines.length === 0) {
+                    throw new Error('Žádná data v tabulce');
+                }
+
+                rawData = [];
+                
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(',');
+                    
+                    if (values.length < 5) continue;
+                    
+                    let datetime;
+                    const dateStr = values[0];
+                    
+                    if (dateStr.includes('.')) {
+                        const parts = dateStr.split(' ');
+                        if (parts.length >= 2) {
+                            const datePart = parts[0];
+                            const timePart = parts[1];
+                            const [day, month, year] = datePart.split('.');
+                            datetime = new Date(`${year}-${month}-${day}T${timePart}`);
+                        } else {
+                            datetime = new Date(dateStr);
+                        }
+                    } else {
+                        datetime = new Date(dateStr);
+                    }
+                    
+                    if (isNaN(datetime.getTime())) continue;
+                    
+                    const parseNumber = (str) => {
+                        if (!str || str.trim() === '') return 0;
+                        return parseFloat(str.trim().replace(',', '.')) || 0;
+                    };
+                    
+                    const spotrebaKwh = parseNumber(values[1]);
+                    const vykonW = parseNumber(values[2]);
+                    const napeti = parseNumber(values[3]);
+                    const proud = parseNumber(values[4]);
+                    
+                    rawData.push({
+                        datetime,
+                        spotrebaKwh,
+                        vykonW,
+                        napeti,
+                        proud
+                    });
+                }
+
+                if (rawData.length === 0) {
+                    throw new Error('Žádná platná data po zpracování');
+                }
+
+                rawData.sort((a, b) => a.datetime - b.datetime);
+                
+                let cumulative = 0;
+                rawData.forEach(d => {
+                    cumulative += d.spotrebaKwh;
+                    d.kumulativniSpotrebaKwh = cumulative;
+                });
+
+                document.getElementById('loading').style.display = 'none';
+                showDashboard();
+                
+                if (Object.keys(charts).length === 0) {
+                    initializeCharts();
+                    initializeSliders();
+                }
+                
+                updateCharts();
+            } catch (error) {
+                showError('Chyba zpracování dat: ' + error.message);
+            }
+        }
+
+        function showError(msg) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').textContent = '❌ ' + msg;
+            document.getElementById('error').style.display = 'block';
+        }
+
+        function showDashboard() {
+            document.getElementById('filters').style.display = 'flex';
+            document.getElementById('statsGrid').style.display = 'grid';
+            document.getElementById('chartsGrid').style.display = 'grid';
+        }
+
+        function updateCharts() {
+            const range = document.getElementById('timeRange')?.value || '7';
+            const dateFrom = document.getElementById('dateFrom')?.value;
+            const dateTo = document.getElementById('dateTo')?.value;
+            
+            const customDateGroup = document.getElementById('customDateGroup');
+            if (range === 'custom') {
+                customDateGroup.style.display = 'flex';
+            } else {
+                customDateGroup.style.display = 'none';
+            }
+
+            filteredData = [...rawData];
+
+            if (range === 'custom' && dateFrom && dateTo) {
+                const from = new Date(dateFrom);
+                const to = new Date(dateTo);
+                to.setHours(23, 59, 59, 999);
+                filteredData = filteredData.filter(d => d.datetime >= from && d.datetime <= to);
+            } else if (range !== 'all') {
+                const cutoff = new Date();
+                cutoff.setDate(cutoff.getDate() - parseInt(range));
+                filteredData = filteredData.filter(d => d.datetime >= cutoff);
+            }
+
+            updateStats(filteredData);
+            updateAllCharts(filteredData);
+            updateAggregatedCharts(filteredData);
+            updateStatistics(filteredData);
+            updateHeatmap(rawData);
+
+            // Reset všech posuvníků na plnou šířku
+            ['delta', 'consumption', 'power', 'voltage', 'current'].forEach(name => {
+                const sliderWindow = document.getElementById(`${name}SliderWindow`);
+                if (sliderWindow) {
+                    sliderWindow.style.left = '0%';
+                    sliderWindow.style.width = '100%';
+                    sliderWindow.style.right = '';
+                }
+            });
+        }
+
+        function updateStats(data) {
+            const pricePerKwh = parseFloat(document.getElementById('pricePerKwh')?.value || 4.5);
+            
+            const stats = {
+                vykon: calcStatsWithTime(data.map(d => ({ value: d.vykonW, time: d.datetime }))),
+                napeti: calcStatsWithTime(data.map(d => ({ value: d.napeti, time: d.datetime }))),
+                proud: calcStatsWithTime(data.map(d => ({ value: d.proud, time: d.datetime }))),
+                spotreba: {
+                    total: data.length > 0 ? data[data.length - 1].kumulativniSpotrebaKwh - data[0].kumulativniSpotrebaKwh : 0,
+                    current: data.length > 0 ? data[data.length - 1].kumulativniSpotrebaKwh : 0
+                }
+            };
+
+            const totalCost = stats.spotreba.total * pricePerKwh;
+
+            document.getElementById('statsGrid').innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-label">OKAMŽITÝ VÝKON</div>
+                    <div class="stat-value">${stats.vykon.current.value.toFixed(0)} W</div>
+                    <div class="stat-timestamp">📅 ${formatDateTime(stats.vykon.current.time)}</div>
+                    <div class="stat-trend ${stats.vykon.trend >= 0 ? 'up' : 'down'}">
+                        ${stats.vykon.trend >= 0 ? '↑' : '↓'} ${Math.abs(stats.vykon.trend).toFixed(0)} W od předchozího
+                    </div>
+                    <div class="stat-meta">
+                        Max: ${stats.vykon.max.value.toFixed(0)} W<br>
+                        <small>${formatDateTime(stats.vykon.max.time)}</small><br>
+                        Průměr: ${stats.vykon.avg.toFixed(0)} W
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-label">CELKOVÁ SPOTŘEBA</div>
+                    <div class="stat-value">${stats.spotreba.total.toFixed(2)} kWh</div>
+                    <div class="stat-timestamp">Za zvolené období</div>
+                    <div class="cost-display">
+                        <div style="font-size: 0.9em; opacity: 0.8;">Náklady</div>
+                        <div class="cost-value">${totalCost.toFixed(2)} Kč</div>
+                        <div style="font-size: 0.8em; opacity: 0.7;">při ${pricePerKwh} Kč/kWh</div>
+                    </div>
+                    <div class="stat-meta" style="margin-top: 10px;">
+                        Kumulativní: ${stats.spotreba.current.toFixed(2)} kWh
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🔌</div>
+                    <div class="stat-label">NAPĚTÍ</div>
+                    <div class="stat-value">${stats.napeti.current.value.toFixed(1)} V</div>
+                    <div class="stat-timestamp">📅 ${formatDateTime(stats.napeti.current.time)}</div>
+                    <div class="stat-trend ${stats.napeti.trend >= 0 ? 'up' : 'down'}">
+                        ${stats.napeti.trend >= 0 ? '↑' : '↓'} ${Math.abs(stats.napeti.trend).toFixed(1)} V
+                    </div>
+                    <div class="stat-meta">
+                        Min: ${stats.napeti.min.value.toFixed(1)} V<br>
+                        <small>${formatDateTime(stats.napeti.min.time)}</small><br>
+                        Max: ${stats.napeti.max.value.toFixed(1)} V<br>
+                        <small>${formatDateTime(stats.napeti.max.time)}</small>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🌊</div>
+                    <div class="stat-label">PROUD</div>
+                    <div class="stat-value">${stats.proud.current.value.toFixed(2)} A</div>
+                    <div class="stat-timestamp">📅 ${formatDateTime(stats.proud.current.time)}</div>
+                    <div class="stat-trend ${stats.proud.trend >= 0 ? 'up' : 'down'}">
+                        ${stats.proud.trend >= 0 ? '↑' : '↓'} ${Math.abs(stats.proud.trend).toFixed(2)} A
+                    </div>
+                    <div class="stat-meta">
+                        Max: ${stats.proud.max.value.toFixed(2)} A<br>
+                        <small>${formatDateTime(stats.proud.max.time)}</small><br>
+                        Průměr: ${stats.proud.avg.toFixed(2)} A
+                    </div>
+                </div>
+            `;
+        }
+
+        function calcStatsWithTime(items) {
+            if (items.length === 0) return { 
+                current: {value: 0, time: new Date()}, 
+                min: {value: 0, time: new Date()}, 
+                max: {value: 0, time: new Date()}, 
+                avg: 0, 
+                trend: 0 
+            };
+            
+            const values = items.map(i => i.value);
+            const current = items[items.length - 1];
+            const previous = items[Math.max(0, items.length - 10)];
+            
+            const minValue = Math.min(...values);
+            const maxValue = Math.max(...values);
+            const minItem = items.find(i => i.value === minValue);
+            const maxItem = items.find(i => i.value === maxValue);
+            
+            return {
+                current,
+                min: minItem,
+                max: maxItem,
+                avg: values.reduce((a, b) => a + b, 0) / values.length,
+                trend: current.value - previous.value
+            };
+        }
+
+        function initializeCharts() {
+            const zoomOptions = {
+                zoom: {
+                    wheel: { enabled: true, speed: 0.1 },
+                    pinch: { enabled: true },
+                    mode: 'x'
+                },
+                pan: {
+                    enabled: true,
+                    mode: 'x'
+                }
+            };
+
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { 
+                        display: true,
+                        labels: { color: 'rgba(255,255,255,0.8)' }
+                    },
+                    zoom: zoomOptions,
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff'
+                    },
+                    annotation: { annotations: {} }
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: { 
+                            unit: 'hour',
+                            displayFormats: { 
+                                hour: 'HH:mm',
+                                day: 'dd.MM'
+                            },
+                            tooltipFormat: 'dd.MM.yyyy HH:mm'
+                        },
+                        ticks: { color: 'rgba(255,255,255,0.7)' },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    }
+                }
+            };
+
+            charts.delta = new Chart(document.getElementById('deltaChart'), {
+                type: 'bar',
+                data: { datasets: [] },
+                options: {
+                    ...commonOptions,
+                    scales: {
+                        ...commonOptions.scales,
+                        y: {
+                            title: { display: true, text: 'kWh', color: 'rgba(255,255,255,0.8)' },
+                            ticks: { color: 'rgba(255,255,255,0.7)' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        }
+                    },
+                    barPercentage: 1.0,
+                    categoryPercentage: 1.0
+                }
+            });
+
+            charts.consumption = new Chart(document.getElementById('consumptionChart'), {
+                type: 'line',
+                data: { datasets: [] },
+                options: {
+                    ...commonOptions,
+                    scales: {
+                        ...commonOptions.scales,
+                        y: {
+                            title: { display: true, text: 'kWh', color: 'rgba(255,255,255,0.8)' },
+                            ticks: { color: 'rgba(255,255,255,0.7)' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        }
+                    }
+                }
+            });
+
+            charts.power = new Chart(document.getElementById('powerChart'), {
+                type: 'line',
+                data: { datasets: [] },
+                options: {
+                    ...commonOptions,
+                    scales: {
+                        ...commonOptions.scales,
+                        y: {
+                            title: { display: true, text: 'W', color: 'rgba(255,255,255,0.8)' },
+                            ticks: { color: 'rgba(255,255,255,0.7)' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        }
+                    }
+                }
+            });
+
+            charts.voltage = new Chart(document.getElementById('voltageChart'), {
+                type: 'line',
+                data: { datasets: [] },
+                options: {
+                    ...commonOptions,
+                    scales: {
+                        ...commonOptions.scales,
+                        y: {
+                            title: { display: true, text: 'V', color: 'rgba(255,255,255,0.8)' },
+                            ticks: { color: 'rgba(255,255,255,0.7)' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        }
+                    }
+                }
+            });
+
+            charts.current = new Chart(document.getElementById('currentChart'), {
+                type: 'line',
+                data: { datasets: [] },
+                options: {
+                    ...commonOptions,
+                    scales: {
+                        ...commonOptions.scales,
+                        y: {
+                            title: { display: true, text: 'A', color: 'rgba(255,255,255,0.8)' },
+                            ticks: { color: 'rgba(255,255,255,0.7)' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        }
+                    }
+                }
+            });
+
+            const aggregatedOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff'
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: 'rgba(255,255,255,0.7)' },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    },
+                    y: {
+                        title: { display: true, text: 'kWh', color: 'rgba(255,255,255,0.8)' },
+                        ticks: { color: 'rgba(255,255,255,0.7)' },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    }
+                }
+            };
+
+            charts.dailyConsumption = new Chart(document.getElementById('dailyConsumptionChart'), {
+                type: 'bar',
+                data: { datasets: [] },
+                options: aggregatedOptions
+            });
+
+            charts.monthlyConsumption = new Chart(document.getElementById('monthlyConsumptionChart'), {
+                type: 'bar',
+                data: { datasets: [] },
+                options: aggregatedOptions
+            });
+
+            charts.yearlyConsumption = new Chart(document.getElementById('yearlyConsumptionChart'), {
+                type: 'bar',
+                data: { datasets: [] },
+                options: aggregatedOptions
+            });
+        }
+
+        function updateAllCharts(data) {
+            const deltaData = [];
+            for (let i = 0; i < data.length; i++) {
+                if (data[i].spotrebaKwh > 0) {
+                    deltaData.push({ 
+                        x: data[i].datetime, 
+                        y: data[i].spotrebaKwh 
+                    });
+                }
+            }
+            
+            charts.delta.data.datasets = [{
+                label: 'Přírůstek spotřeby (kWh)',
+                data: deltaData,
+                backgroundColor: 'rgba(255, 193, 7, 0.8)',
+                borderColor: 'rgba(255, 193, 7, 1)',
+                borderWidth: 1
+            }];
+            charts.delta.options.scales.x.min = undefined;
+            charts.delta.options.scales.x.max = undefined;
+
+            charts.consumption.data.datasets = [{
+                label: 'Kumulativní spotřeba (kWh)',
+                data: data.map(d => ({ x: d.datetime, y: d.kumulativniSpotrebaKwh })),
+                borderColor: '#4caf50',
+                backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 2
+            }];
+            charts.consumption.options.scales.x.min = undefined;
+            charts.consumption.options.scales.x.max = undefined;
+
+            charts.power.data.datasets = [{
+                label: 'Výkon (W)',
+                data: data.map(d => ({ x: d.datetime, y: d.vykonW })),
+                borderColor: '#ff9800',
+                backgroundColor: 'rgba(255, 152, 0, 0.2)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 2
+            }];
+            charts.power.options.scales.x.min = undefined;
+            charts.power.options.scales.x.max = undefined;
+
+            charts.voltage.data.datasets = [{
+                label: 'Napětí (V)',
+                data: data.map(d => ({ x: d.datetime, y: d.napeti })),
+                borderColor: '#2196f3',
+                backgroundColor: 'rgba(33, 150, 243, 0.2)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 2
+            }];
+            charts.voltage.options.scales.x.min = undefined;
+            charts.voltage.options.scales.x.max = undefined;
+
+            charts.current.data.datasets = [{
+                label: 'Proud (A)',
+                data: data.map(d => ({ x: d.datetime, y: d.proud })),
+                borderColor: '#9c27b0',
+                backgroundColor: 'rgba(156, 39, 176, 0.2)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 2
+            }];
+            charts.current.options.scales.x.min = undefined;
+            charts.current.options.scales.x.max = undefined;
+
+            const daysDiff = data.length > 0 ? (data[data.length - 1].datetime - data[0].datetime) / (1000 * 60 * 60 * 24) : 0;
+            const showMidnightLines = daysDiff <= 60;
+            
+            if (showMidnightLines) {
+                addMidnightLines(charts.delta, data);
+                addMidnightLines(charts.consumption, data);
+                addMidnightLines(charts.power, data);
+                addMidnightLines(charts.voltage, data);
+                addMidnightLines(charts.current, data);
+            } else {
+                ['delta', 'consumption', 'power', 'voltage', 'current'].forEach(chartName => {
+                    if (charts[chartName] && charts[chartName].options.plugins.annotation) {
+                        charts[chartName].options.plugins.annotation.annotations = {};
+                    }
+                });
+            }
+
+            Object.values(charts).forEach(chart => chart.update());
+            
+            ['delta', 'consumption', 'power', 'voltage', 'current'].forEach(name => {
+                drawSliderPreview(name, data);
+            });
+        }
+
+        function addMidnightLines(chart, data) {
+            if (!data || data.length === 0) return;
+            
+            const midnights = [];
+            const startDate = new Date(data[0].datetime);
+            const endDate = new Date(data[data.length - 1].datetime);
+            
+            let current = new Date(startDate);
+            current.setHours(0, 0, 0, 0);
+            current.setDate(current.getDate() + 1);
+            
+            while (current <= endDate) {
+                midnights.push(current.getTime());
+                current = new Date(current);
+                current.setDate(current.getDate() + 1);
+            }
+            
+            if (!chart.options.plugins) chart.options.plugins = {};
+            if (!chart.options.plugins.annotation) {
+                chart.options.plugins.annotation = { annotations: {} };
+            }
+            
+            chart.options.plugins.annotation.annotations = {};
+            
+            midnights.forEach((midnight, idx) => {
+                chart.options.plugins.annotation.annotations[`midnight${idx}`] = {
+                    type: 'line',
+                    xMin: midnight,
+                    xMax: midnight,
+                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    borderWidth: 2,
+                    borderDash: [5, 5]
+                };
+            });
+        }
+
+        function getColorForPower(power, minPower, maxPower) {
+            const range = maxPower - minPower || 1;
+            const ratio = Math.max(0, Math.min(1, (power - minPower) / range));
+            
+            let r, g, b;
+            
+            if (ratio < 0.2) {
+                const t = ratio / 0.2;
+                r = 255;
+                g = 255;
+                b = Math.round(255 - t * 55);
+            } else if (ratio < 0.4) {
+                const t = (ratio - 0.2) / 0.2;
+                r = 255;
+                g = 255;
+                b = Math.round(200 - t * 200);
+            } else if (ratio < 0.6) {
+                const t = (ratio - 0.4) / 0.2;
+                r = 255;
+                g = Math.round(255 - t * 90);
+                b = 0;
+            } else if (ratio < 0.8) {
+                const t = (ratio - 0.6) / 0.2;
+                r = 255;
+                g = Math.round(165 - t * 100);
+                b = 0;
+            } else {
+                const t = (ratio - 0.8) / 0.2;
+                r = Math.round(255 - t * 220);
+                g = Math.round(65 - t * 65);
+                b = 0;
+            }
+            
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        function updateHeatmap(data) {
+            const currentYear = new Date().getFullYear();
+            const daysInYear = isLeapYear(currentYear) ? 366 : 365;
+            
+            const matrix = Array(daysInYear).fill(null).map(() => Array(24).fill(null).map(() => []));
+            
+            data.forEach(d => {
+                if (d.datetime.getFullYear() !== currentYear) return;
+                
+                const dayOfYear = getDayOfYear(d.datetime);
+                const hour = d.datetime.getHours();
+                
+                if (dayOfYear >= 0 && dayOfYear < daysInYear && hour >= 0 && hour < 24) {
+                    matrix[dayOfYear][hour].push(d.vykonW);
+                }
+            });
+
+            const avgMatrix = matrix.map(day => 
+                day.map(hours => 
+                    hours.length > 0 ? hours.reduce((a, b) => a + b, 0) / hours.length : null
+                )
+            );
+
+            const allPowers = avgMatrix.flat().filter(p => p !== null);
+            if (allPowers.length === 0) {
+                document.getElementById('heatmapGrid').innerHTML = '<p style="color: rgba(255,255,255,0.6); padding: 20px;">Nedostatek dat pro zobrazení heatmapy</p>';
+                return;
+            }
+
+            const minPower = Math.min(...allPowers);
+            const maxPower = Math.max(...allPowers);
+
+            document.getElementById('heatmapMin').textContent = minPower.toFixed(0) + 'W';
+            document.getElementById('heatmapMax').textContent = maxPower.toFixed(0) + 'W';
+
+            const heatmapDiv = document.getElementById('heatmapGrid');
+            heatmapDiv.innerHTML = '';
+
+            const gridContainer = document.createElement('div');
+            gridContainer.className = 'heatmap-grid';
+
+            const yLabels = document.createElement('div');
+            yLabels.className = 'heatmap-y-labels';
+            
+            for (let hour = 0; hour < 24; hour++) {
+                const label = document.createElement('div');
+                label.className = 'heatmap-y-label';
+                label.textContent = hour + ':00';
+                yLabels.appendChild(label);
+            }
+            gridContainer.appendChild(yLabels);
+
+            const contentWrapper = document.createElement('div');
+            contentWrapper.className = 'heatmap-content-wrapper';
+
+            const xLabels = document.createElement('div');
+            xLabels.className = 'heatmap-x-labels';
+            
+            const monthNames = ['Led', 'Úno', 'Bře', 'Dub', 'Kvě', 'Čvn', 'Čvc', 'Srp', 'Zář', 'Říj', 'Lis', 'Pro'];
+            const daysInMonth = [31, isLeapYear(currentYear) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+            let cumulativeDays = 0;
+            monthNames.forEach((month, idx) => {
+                const monthLabel = document.createElement('div');
+                monthLabel.className = 'heatmap-month-label';
+                monthLabel.textContent = month;
+                const position = ((cumulativeDays + daysInMonth[idx] / 2) / daysInYear) * 100;
+                monthLabel.style.left = position + '%';
+                xLabels.appendChild(monthLabel);
+                cumulativeDays += daysInMonth[idx];
+            });
+            contentWrapper.appendChild(xLabels);
+
+            const dataDiv = document.createElement('div');
+            dataDiv.className = 'heatmap-data';
+
+            avgMatrix.forEach((dayData, dayIndex) => {
+                const dayColumn = document.createElement('div');
+                dayColumn.className = 'heatmap-day-column';
+
+                dayData.forEach((power, hour) => {
+                    const cell = document.createElement('div');
+                    cell.className = 'heatmap-hour-cell';
+
+                    if (power !== null) {
+                        cell.style.background = getColorForPower(power, minPower, maxPower);
+                        
+                        const date = getDateFromDayOfYear(dayIndex, currentYear);
+                        cell.title = `${date.getDate()}. ${date.getMonth() + 1}. ${currentYear} ${hour}:00 - ${power.toFixed(0)}W`;
+                    } else {
+                        cell.style.background = 'rgba(255,255,255,0.05)';
+                    }
+
+                    dayColumn.appendChild(cell);
+                });
+
+                dataDiv.appendChild(dayColumn);
+            });
+
+            contentWrapper.appendChild(dataDiv);
+            gridContainer.appendChild(contentWrapper);
+            heatmapDiv.appendChild(gridContainer);
+        }
+
+        function isLeapYear(year) {
+            return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+        }
+
+        function getDayOfYear(date) {
+            const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+            const start = new Date(Date.UTC(date.getFullYear(), 0, 0));
+            const diff = utcDate - start;
+            const oneDay = 1000 * 60 * 60 * 24;
+            return Math.floor(diff / oneDay) - 1;
+        }
+
+        function getDateFromDayOfYear(dayOfYear, year) {
+            const date = new Date(year, 0, 1);
+            date.setDate(date.getDate() + dayOfYear);
+            return date;
+        }
+
+        function initializeSliders() {
+            const sliderNames = ['delta', 'consumption', 'power', 'voltage', 'current'];
+            
+            sliderNames.forEach(name => {
+                const sliderWindow = document.getElementById(`${name}SliderWindow`);
+                const slider = document.getElementById(`${name}Slider`);
+                
+                if (!sliderWindow || !slider) return;
+                
+                sliders[name] = {
+                    window: sliderWindow,
+                    slider: slider,
+                    isDragging: false,
+                    isResizing: false,
+                    resizeHandle: null,
+                    startX: 0,
+                    startLeft: 0,
+                    startWidth: 0,
+                    startRight: 0
+                };
+
+                sliderWindow.style.left = '0%';
+                sliderWindow.style.width = '100%';
+                sliderWindow.style.right = '';
+
+                sliderWindow.addEventListener('mousedown', (e) => {
+                    if (e.target.classList.contains('chart-slider-handle')) return;
+                    handleSliderMouseDown(e, name);
+                });
+                
+                const leftHandle = sliderWindow.querySelector('.chart-slider-handle.left');
+                const rightHandle = sliderWindow.querySelector('.chart-slider-handle.right');
+
+                if (leftHandle) {
+                    leftHandle.addEventListener('mousedown', (e) => handleResizeStart(e, name, 'left'));
+                }
+                
+                if (rightHandle) {
+                    rightHandle.addEventListener('mousedown', (e) => handleResizeStart(e, name, 'right'));
+                }
+            });
+
+            document.addEventListener('mousemove', handleSliderMouseMove);
+            document.addEventListener('mouseup', handleSliderMouseUp);
+        }
+
+        function handleSliderMouseDown(e, name) {
+            const slider = sliders[name];
+            if (!slider) return;
+            
+            slider.isDragging = true;
+            slider.startX = e.clientX;
+            
+            const parentRect = slider.slider.getBoundingClientRect();
+            const windowRect = slider.window.getBoundingClientRect();
+            
+            slider.startLeft = ((windowRect.left - parentRect.left) / parentRect.width) * 100;
+            slider.startWidth = (windowRect.width / parentRect.width) * 100;
+            
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function handleResizeStart(e, name, handle) {
+            const slider = sliders[name];
+            if (!slider) return;
+            
+            slider.isResizing = true;
+            slider.resizeHandle = handle;
+            slider.startX = e.clientX;
+            
+            const parentRect = slider.slider.getBoundingClientRect();
+            const windowRect = slider.window.getBoundingClientRect();
+            
+            slider.startLeft = ((windowRect.left - parentRect.left) / parentRect.width) * 100;
+            slider.startWidth = (windowRect.width / parentRect.width) * 100;
+            slider.startRight = slider.startLeft + slider.startWidth;
+            
+            e.stopPropagation();
+            e.preventDefault();
+        }
+
+        function handleSliderMouseMove(e) {
+            let needsUpdate = false;
+            let updateName = null;
+            
+            Object.keys(sliders).forEach(name => {
+                const slider = sliders[name];
+                if (!slider.isDragging && !slider.isResizing) return;
+
+                const parentRect = slider.slider.getBoundingClientRect();
+                const deltaX = e.clientX - slider.startX;
+                const deltaPercent = (deltaX / parentRect.width) * 100;
+
+                if (slider.isDragging) {
+                    let newLeft = slider.startLeft + deltaPercent;
+                    newLeft = Math.max(0, Math.min(100 - slider.startWidth, newLeft));
+                    
+                    slider.window.style.left = newLeft.toFixed(2) + '%';
+                    slider.window.style.width = slider.startWidth.toFixed(2) + '%';
+                    slider.window.style.right = '';
+                    
+                    needsUpdate = true;
+                    updateName = name;
+                } 
+                else if (slider.isResizing) {
+                    if (slider.resizeHandle === 'left') {
+                        let newLeft = slider.startLeft + deltaPercent;
+                        let newWidth = slider.startWidth - deltaPercent;
+                        const minWidth = 5;
+                        
+                        if (newWidth < minWidth) {
+                            newWidth = minWidth;
+                            newLeft = slider.startRight - minWidth;
+                        }
+                        
+                        newLeft = Math.max(0, newLeft);
+                        
+                        if (newLeft + newWidth > 100) {
+                            newWidth = 100 - newLeft;
+                        }
+                        
+                        slider.window.style.left = newLeft.toFixed(2) + '%';
+                        slider.window.style.width = newWidth.toFixed(2) + '%';
+                        slider.window.style.right = '';
+                    } 
+                    else if (slider.resizeHandle === 'right') {
+                        let newWidth = slider.startWidth + deltaPercent;
+                        const minWidth = 5;
+                        newWidth = Math.max(minWidth, newWidth);
+                        const maxWidth = 100 - slider.startLeft;
+                        newWidth = Math.min(maxWidth, newWidth);
+                        
+                        slider.window.style.width = newWidth.toFixed(2) + '%';
+                        slider.window.style.right = '';
+                    }
+                    
+                    needsUpdate = true;
+                    updateName = name;
+                }
+            });
+            
+            if (needsUpdate && updateName) {
+                updateChartFromSlider(updateName);
+            }
+        }
+
+        function handleSliderMouseUp() {
+            Object.keys(sliders).forEach(name => {
+                sliders[name].isDragging = false;
+                sliders[name].isResizing = false;
+                sliders[name].resizeHandle = null;
+            });
+        }
+
+        function updateChartFromSlider(name) {
+            if (!charts[name] || !filteredData.length) return;
+
+            const slider = sliders[name];
+            const parentRect = slider.slider.getBoundingClientRect();
+            const windowRect = slider.window.getBoundingClientRect();
+
+            const leftPercent = ((windowRect.left - parentRect.left) / parentRect.width) * 100;
+            const widthPercent = (windowRect.width / parentRect.width) * 100;
+            const rightPercent = leftPercent + widthPercent;
+
+            const startIndex = Math.max(0, Math.floor((leftPercent / 100) * filteredData.length));
+            const endIndex = Math.min(filteredData.length, Math.ceil((rightPercent / 100) * filteredData.length));
+
+            const sliderData = filteredData.slice(startIndex, endIndex);
+
+            if (sliderData.length === 0) return;
+
+            const startDate = sliderData[0].datetime;
+            const endDate = sliderData[sliderData.length - 1].datetime;
+
+            const startLabel = document.getElementById(`${name}SliderStart`);
+            const endLabel = document.getElementById(`${name}SliderEnd`);
+            
+            if (startLabel) {
+                startLabel.textContent = startDate.toLocaleString('cs-CZ', { 
+                    day: '2-digit', 
+                    month: '2-digit', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+            }
+            
+            if (endLabel) {
+                endLabel.textContent = endDate.toLocaleString('cs-CZ', { 
+                    day: '2-digit', 
+                    month: '2-digit', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+            }
+
+            updateSingleChart(name, sliderData);
+        }
+
+        function updateSingleChart(name, data) {
+            if (name === 'delta' && charts.delta) {
+                const deltaData = [];
+                for (let i = 0; i < data.length; i++) {
+                    if (data[i].spotrebaKwh > 0) {
+                        deltaData.push({ 
+                            x: data[i].datetime, 
+                            y: data[i].spotrebaKwh 
+                        });
+                    }
+                }
+                charts.delta.data.datasets[0].data = deltaData;
+                
+                if (data.length > 0) {
+                    charts.delta.options.scales.x.min = data[0].datetime;
+                    charts.delta.options.scales.x.max = data[data.length - 1].datetime;
+                }
+                
+                charts.delta.update('none');
+            } else if (name === 'consumption' && charts.consumption) {
+                charts.consumption.data.datasets[0].data = data.map(d => ({ x: d.datetime, y: d.kumulativniSpotrebaKwh }));
+                
+                if (data.length > 0) {
+                    charts.consumption.options.scales.x.min = data[0].datetime;
+                    charts.consumption.options.scales.x.max = data[data.length - 1].datetime;
+                }
+                
+                charts.consumption.update('none');
+            } else if (name === 'power' && charts.power) {
+                charts.power.data.datasets[0].data = data.map(d => ({ x: d.datetime, y: d.vykonW }));
+                
+                if (data.length > 0) {
+                    charts.power.options.scales.x.min = data[0].datetime;
+                    charts.power.options.scales.x.max = data[data.length - 1].datetime;
+                }
+                
+                charts.power.update('none');
+            } else if (name === 'voltage' && charts.voltage) {
+                charts.voltage.data.datasets[0].data = data.map(d => ({ x: d.datetime, y: d.napeti }));
+                
+                if (data.length > 0) {
+                    charts.voltage.options.scales.x.min = data[0].datetime;
+                    charts.voltage.options.scales.x.max = data[data.length - 1].datetime;
+                }
+                
+                charts.voltage.update('none');
+            } else if (name === 'current' && charts.current) {
+                charts.current.data.datasets[0].data = data.map(d => ({ x: d.datetime, y: d.proud }));
+                
+                if (data.length > 0) {
+                    charts.current.options.scales.x.min = data[0].datetime;
+                    charts.current.options.scales.x.max = data[data.length - 1].datetime;
+                }
+                
+                charts.current.update('none');
+            }
+        }
+
+        function drawSliderPreview(name, data) {
+            const canvas = document.getElementById(`${name}SliderPreview`);
+            if (!canvas || !data.length) return;
+
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width = canvas.offsetWidth * 2;
+            const height = canvas.height = canvas.offsetHeight * 2;
+            
+            ctx.clearRect(0, 0, width, height);
+
+            let values;
+            if (name === 'delta') values = data.map(d => d.spotrebaKwh);
+            else if (name === 'consumption') values = data.map(d => d.kumulativniSpotrebaKwh);
+            else if (name === 'power') values = data.map(d => d.vykonW);
+            else if (name === 'voltage') values = data.map(d => d.napeti);
+            else if (name === 'current') values = data.map(d => d.proud);
+
+            if (!values || values.length === 0) return;
+
+            const min = Math.min(...values);
+            const max = Math.max(...values);
+            const range = max - min || 1;
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#667eea';
+            ctx.lineWidth = 2;
+
+            values.forEach((val, i) => {
+                const x = (i / (values.length - 1)) * width;
+                const y = height - ((val - min) / range) * height * 0.8 - height * 0.1;
+                
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+
+            ctx.stroke();
+        }
+
+        function updateAggregatedCharts(data) {
+            if (data.length === 0) return;
+
+            const dailyData = {};
+            data.forEach(d => {
+                const dateKey = d.datetime.toLocaleDateString('cs-CZ');
+                if (!dailyData[dateKey]) {
+                    dailyData[dateKey] = 0;
+                }
+                dailyData[dateKey] += d.spotrebaKwh;
+            });
+
+            const dailyLabels = Object.keys(dailyData);
+            const dailyValues = Object.values(dailyData);
+
+            charts.dailyConsumption.data = {
+                labels: dailyLabels,
+                datasets: [{
+                    label: 'Spotřeba (kWh)',
+                    data: dailyValues,
+                    backgroundColor: 'rgba(76, 175, 80, 0.8)',
+                    borderColor: 'rgba(76, 175, 80, 1)',
+                    borderWidth: 1
+                }]
+            };
+            charts.dailyConsumption.update();
+
+            const monthlyData = {};
+            data.forEach(d => {
+                const monthKey = `${d.datetime.getFullYear()}-${String(d.datetime.getMonth() + 1).padStart(2, '0')}`;
+                if (!monthlyData[monthKey]) {
+                    monthlyData[monthKey] = 0;
+                }
+                monthlyData[monthKey] += d.spotrebaKwh;
+            });
+
+            const monthlyLabels = Object.keys(monthlyData).map(key => {
+                const [year, month] = key.split('-');
+                const monthNames = ['Led', 'Úno', 'Bře', 'Dub', 'Kvě', 'Čvn', 'Čvc', 'Srp', 'Zář', 'Říj', 'Lis', 'Pro'];
+                return `${monthNames[parseInt(month) - 1]} ${year}`;
+            });
+            const monthlyValues = Object.values(monthlyData);
+
+            charts.monthlyConsumption.data = {
+                labels: monthlyLabels,
+                datasets: [{
+                    label: 'Spotřeba (kWh)',
+                    data: monthlyValues,
+                    backgroundColor: 'rgba(33, 150, 243, 0.8)',
+                    borderColor: 'rgba(33, 150, 243, 1)',
+                    borderWidth: 1
+                }]
+            };
+            charts.monthlyConsumption.update();
+
+            const yearlyData = {};
+            data.forEach(d => {
+                const year = d.datetime.getFullYear();
+                if (!yearlyData[year]) {
+                    yearlyData[year] = 0;
+                }
+                yearlyData[year] += d.spotrebaKwh;
+            });
+
+            const yearlyLabels = Object.keys(yearlyData);
+            const yearlyValues = Object.values(yearlyData);
+
+            charts.yearlyConsumption.data = {
+                labels: yearlyLabels,
+                datasets: [{
+                    label: 'Spotřeba (kWh)',
+                    data: yearlyValues,
+                    backgroundColor: 'rgba(156, 39, 176, 0.8)',
+                    borderColor: 'rgba(156, 39, 176, 1)',
+                    borderWidth: 1
+                }]
+            };
+            charts.yearlyConsumption.update();
+        }
+
+        function updateStatistics(data) {
+            if (data.length === 0) {
+                document.getElementById('statisticsGrid').innerHTML = '<p style="color: rgba(255,255,255,0.6);">Nedostatek dat</p>';
+                return;
+            }
+
+            const pricePerKwh = parseFloat(document.getElementById('pricePerKwh')?.value || 4.5);
+
+            const powers = data.map(d => d.vykonW);
+            const voltages = data.map(d => d.napeti);
+            const currents = data.map(d => d.proud);
+            const consumptions = data.map(d => d.spotrebaKwh);
+
+            const totalConsumption = consumptions.reduce((a, b) => a + b, 0);
+            const avgPower = powers.reduce((a, b) => a + b, 0) / powers.length;
+            const maxPower = Math.max(...powers);
+            const minPower = Math.min(...powers);
+            const maxPowerTime = data[powers.indexOf(maxPower)].datetime;
+            const minPowerTime = data[powers.indexOf(minPower)].datetime;
+
+            const hourlyConsumption = Array(24).fill(0);
+            const hourlyCounts = Array(24).fill(0);
+            data.forEach(d => {
+                const hour = d.datetime.getHours();
+                hourlyConsumption[hour] += d.vykonW;
+                hourlyCounts[hour]++;
+            });
+            const avgHourlyPower = hourlyConsumption.map((sum, i) => hourlyCounts[i] > 0 ? sum / hourlyCounts[i] : 0);
+            const peakHour = avgHourlyPower.indexOf(Math.max(...avgHourlyPower));
+            const offPeakHour = avgHourlyPower.indexOf(Math.min(...avgHourlyPower.filter(p => p > 0)));
+
+            const weekdayConsumption = Array(7).fill(0);
+            const weekdayCounts = Array(7).fill(0);
+            data.forEach(d => {
+                const day = d.datetime.getDay();
+                weekdayConsumption[day] += d.vykonW;
+                weekdayCounts[day]++;
+            });
+            const avgWeekdayPower = weekdayConsumption.map((sum, i) => weekdayCounts[i] > 0 ? sum / weekdayCounts[i] : 0);
+            const peakWeekday = avgWeekdayPower.indexOf(Math.max(...avgWeekdayPower));
+            const weekdayNames = ['Neděle', 'Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota'];
+
+            const timeSpan = (data[data.length - 1].datetime - data[0].datetime) / (1000 * 60 * 60 * 24);
+            const avgDailyConsumption = totalConsumption / timeSpan;
+
+            const avgVoltage = voltages.reduce((a, b) => a + b, 0) / voltages.length;
+            const avgCurrent = currents.reduce((a, b) => a + b, 0) / currents.length;
+            const powerFactor = avgPower / (avgVoltage * avgCurrent);
+
+            const totalCost = totalConsumption * pricePerKwh;
+            const avgDailyCost = totalCost / timeSpan;
+            const projectedMonthlyCost = avgDailyCost * 30;
+            const projectedYearlyCost = avgDailyCost * 365;
+
+            document.getElementById('statisticsGrid').innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-label">OBDOBÍ</div>
+                    <div class="stat-value">${timeSpan.toFixed(1)}</div>
+                    <div class="stat-meta">dnů monitorování</div>
+                    <div class="stat-meta" style="margin-top: 10px;">
+                        Od: ${formatDateTime(data[0].datetime)}<br>
+                        Do: ${formatDateTime(data[data.length - 1].datetime)}
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-label">PRŮMĚRNÝ VÝKON</div>
+                    <div class="stat-value">${avgPower.toFixed(0)} W</div>
+                    <div class="stat-meta">
+                        Maximum: ${maxPower.toFixed(0)} W<br>
+                        <small>${formatDateTime(maxPowerTime)}</small><br>
+                        Minimum: ${minPower.toFixed(0)} W<br>
+                        <small>${formatDateTime(minPowerTime)}</small>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">🕐</div>
+                    <div class="stat-label">ŠPIČKA DNE</div>
+                    <div class="stat-value">${peakHour}:00</div>
+                    <div class="stat-meta">
+                        Průměrný výkon: ${avgHourlyPower[peakHour].toFixed(0)} W<br>
+                        Nejnižší: ${offPeakHour}:00 (${avgHourlyPower[offPeakHour].toFixed(0)} W)
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">📅</div>
+                    <div class="stat-label">NEJVYŠŠÍ DEN</div>
+                    <div class="stat-value">${weekdayNames[peakWeekday]}</div>
+                    <div class="stat-meta">
+                        Průměrný výkon: ${avgWeekdayPower[peakWeekday].toFixed(0)} W
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">📈</div>
+                    <div class="stat-label">DENNÍ SPOTŘEBA</div>
+                    <div class="stat-value">${avgDailyConsumption.toFixed(2)}</div>
+                    <div class="stat-meta">kWh/den (průměr)</div>
+                    <div class="cost-display">
+                        <div style="font-size: 0.9em; opacity: 0.8;">Denní náklady</div>
+                        <div class="cost-value">${avgDailyCost.toFixed(2)} Kč</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">💰</div>
+                    <div class="stat-label">PROJEKCE NÁKLADŮ</div>
+                    <div class="stat-value">${projectedMonthlyCost.toFixed(0)}</div>
+                    <div class="stat-meta">Kč/měsíc (odhad)</div>
+                    <div class="stat-meta" style="margin-top: 10px;">
+                        Roční odhad: ${projectedYearlyCost.toFixed(0)} Kč
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">🔌</div>
+                    <div class="stat-label">ÚČINÍK</div>
+                    <div class="stat-value">${powerFactor.toFixed(3)}</div>
+                    <div class="stat-meta">
+                        Power Factor (cos φ)<br>
+                        <small>${powerFactor > 0.95 ? 'Výborný' : powerFactor > 0.85 ? 'Dobrý' : 'Ke zlepšení'}</small>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-label">MĚŘENÍ</div>
+                    <div class="stat-value">${data.length}</div>
+                    <div class="stat-meta">
+                        Celkový počet záznamů<br>
+                        Průměrný interval: ${((timeSpan * 24 * 60) / data.length).toFixed(1)} min
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">⚙️</div>
+                    <div class="stat-label">STABILITA NAPĚTÍ</div>
+                    <div class="stat-value">${avgVoltage.toFixed(1)} V</div>
+                    <div class="stat-meta">
+                        Max: ${Math.max(...voltages).toFixed(1)} V<br>
+                        Min: ${Math.min(...voltages).toFixed(1)} V<br>
+                        Rozptyl: ${(Math.max(...voltages) - Math.min(...voltages)).toFixed(1)} V
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">🌊</div>
+                    <div class="stat-label">PRŮMĚRNÝ PROUD</div>
+                    <div class="stat-value">${avgCurrent.toFixed(2)} A</div>
+                    <div class="stat-meta">
+                        Maximum: ${Math.max(...currents).toFixed(2)} A<br>
+                        Minimum: ${Math.min(...currents).toFixed(2)} A
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">💡</div>
+                    <div class="stat-label">EFEKTIVITA</div>
+                    <div class="stat-value">${(avgPower / 1000 * 24).toFixed(1)}</div>
+                    <div class="stat-meta">
+                        kWh/den při trvalém průměrném výkonu<br>
+                        <small>Skutečná: ${avgDailyConsumption.toFixed(2)} kWh/den</small>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-label">CELKEM ZA OBDOBÍ</div>
+                    <div class="stat-value">${totalConsumption.toFixed(2)}</div>
+                    <div class="stat-meta">kWh</div>
+                    <div class="cost-display">
+                        <div style="font-size: 0.9em; opacity: 0.8;">Celkové náklady</div>
+                        <div class="cost-value">${totalCost.toFixed(2)} Kč</div>
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
