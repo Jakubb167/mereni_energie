@@ -406,10 +406,17 @@
             const range = document.getElementById('timeRange').value;
             const customInputs = document.getElementById('customRangeInputs');
             if (range === 'custom') customInputs.classList.add('active');
-            else { customInputs.classList.remove('active'); updateCharts(); }
+            else { 
+                customInputs.classList.remove('active'); 
+                window.sliderPositionsSaved = false;
+                updateCharts(); 
+            }
         }
         
-        function applyCustomRange() { updateCharts(); }
+        function applyCustomRange() { 
+            window.sliderPositionsSaved = false;
+            updateCharts(); 
+        }
         
         async function loadData() {
             document.getElementById('loading').style.display = 'block';
@@ -446,6 +453,7 @@
                 document.getElementById('success').style.display = 'block';
                 setTimeout(() => { document.getElementById('success').style.display = 'none'; }, 5000);
                 if (Object.keys(charts).length === 0) { initializeCharts(); initializeSliders(); initializeAggregatedSliders(); }
+                window.sliderPositionsSaved = false;
                 updateCharts();
             } catch (error) {
                 document.getElementById('loading').style.display = 'none';
@@ -486,10 +494,14 @@
             updateAggregatedCharts();
             updateStatistics();
             updateHeatmap();
-            ['delta', 'consumption', 'power', 'voltage', 'current', 'daily', 'monthly', 'yearly'].forEach(name => {
-                const sw = document.getElementById(`${name}SliderWindow`);
-                if (sw) { sw.style.left = '0%'; sw.style.width = '100%'; sw.style.right = ''; }
-            });
+            // Reset posuvníků jen při změně období, ne při každém update
+            if (!window.sliderPositionsSaved) {
+                ['delta', 'consumption', 'power', 'voltage', 'current', 'daily', 'monthly', 'yearly'].forEach(name => {
+                    const sw = document.getElementById(`${name}SliderWindow`);
+                    if (sw) { sw.style.left = '0%'; sw.style.width = '100%'; sw.style.right = ''; }
+                });
+            }
+            window.sliderPositionsSaved = false;
         }
         
         function updateStats() {
@@ -826,6 +838,7 @@
         }
         
         function updateChartFromSlider(name) {
+            window.sliderPositionsSaved = true;
             const s = sliders[name]; if (!s) return;
             const pr = s.slider.getBoundingClientRect(), wr = s.window.getBoundingClientRect();
             const lp = ((wr.left - pr.left) / pr.width) * 100, wp = (wr.width / pr.width) * 100, rp = lp + wp;
@@ -945,6 +958,7 @@
             e.stopPropagation(); e.preventDefault();
         }
         function updateAggregatedChartFromSlider(name) {
+            window.sliderPositionsSaved = true;
             const s = sliders[name];
             if (!s) return;
             const pr = s.slider.getBoundingClientRect(), wr = s.window.getBoundingClientRect();
