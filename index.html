@@ -19,6 +19,83 @@
         .live-indicator { display: inline-flex; align-items: center; background: rgba(102, 126, 234, 0.2); padding: 10px 20px; border-radius: 25px; margin-top: 15px; border: 1px solid rgba(102, 126, 234, 0.3); }
         .live-dot { width: 12px; height: 12px; background: #4ade80; border-radius: 50%; margin-right: 10px; animation: pulse 2s infinite; box-shadow: 0 0 10px #4ade80; }
         @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.8); } }
+
+        /* ── SOURCE SELECTOR ── */
+        .source-selector-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 14px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .source-selector-label {
+            font-size: 0.95em;
+            font-weight: 600;
+            color: rgba(255,255,255,0.85);
+            letter-spacing: 0.5px;
+        }
+        .source-selector {
+            position: relative;
+            display: inline-block;
+        }
+        .source-selector select {
+            appearance: none;
+            -webkit-appearance: none;
+            padding: 10px 42px 10px 18px;
+            background: rgba(102, 126, 234, 0.15);
+            border: 1.5px solid rgba(102, 126, 234, 0.5);
+            border-radius: 14px;
+            color: #fff;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            outline: none;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+            min-width: 200px;
+        }
+        .source-selector select:hover,
+        .source-selector select:focus {
+            background: rgba(102, 126, 234, 0.3);
+            border-color: rgba(102, 126, 234, 0.9);
+            box-shadow: 0 0 16px rgba(102, 126, 234, 0.35);
+        }
+        .source-selector select option {
+            background: #1a1a2e;
+            color: #fff;
+            font-weight: 500;
+        }
+        .source-selector::after {
+            content: '▾';
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(102, 126, 234, 0.9);
+            pointer-events: none;
+            font-size: 1em;
+        }
+        .source-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            background: rgba(74, 222, 128, 0.15);
+            border: 1px solid rgba(74, 222, 128, 0.35);
+            color: #4ade80;
+            transition: all 0.4s;
+        }
+        .source-badge.elektromer {
+            background: rgba(251, 191, 36, 0.15);
+            border-color: rgba(251, 191, 36, 0.35);
+            color: #fbbf24;
+        }
+        /* ── END SOURCE SELECTOR ── */
+
         .nav-tabs { display: flex; gap: 10px; margin-top: 20px; justify-content: center; flex-wrap: wrap; }
         .nav-tab { padding: 12px 30px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 15px; cursor: pointer; transition: all 0.3s; font-weight: 600; font-size: 1em; }
         .nav-tab:hover { background: rgba(102, 126, 234, 0.2); border-color: rgba(102, 126, 234, 0.5); transform: translateY(-2px); }
@@ -108,6 +185,20 @@
             <p class="subtitle">Real-time monitoring odběru elektrické energie</p>
             <div class="live-indicator"><div class="live-dot"></div><span>LIVE DATA - SQL Databáze</span></div>
             <div style="margin-top: 15px; font-size: 1.1em; font-weight: 600; color: rgba(255,255,255,0.9);">🕐 <span id="currentTime">Načítání...</span></div>
+
+            <!-- ── VÝBĚR ZDROJE DAT ── -->
+            <div class="source-selector-wrapper">
+                <span class="source-selector-label">📡 Zdroj dat:</span>
+                <div class="source-selector">
+                    <select id="dataSourceSelect" onchange="onDataSourceChange()">
+                        <option value="shelly">Shelly Sázava</option>
+                        <option value="elektromer">Elektroměr Sázava</option>
+                    </select>
+                </div>
+                <span class="source-badge" id="sourceBadge">● Shelly Sázava</span>
+            </div>
+            <!-- ── KONEC VÝBĚRU ZDROJE DAT ── -->
+
             <div class="nav-tabs">
                 <div class="nav-tab active" data-page="overview" onclick="switchPage('overview', this)">📊 Přehled</div>
                 <div class="nav-tab" data-page="aggregated" onclick="switchPage('aggregated', this)">📈 Agregovaná spotřeba</div>
@@ -429,6 +520,28 @@
         let filteredDataStatistics = [], filteredSpotrebaStatistics = [];
         
         let charts = {}, sliders = {}, currentPage = 'overview', availableYears = [];
+
+        // ── Aktuální zdroj dat ──
+        function getSelectedSource() {
+            return document.getElementById('dataSourceSelect').value;
+        }
+
+        function onDataSourceChange() {
+            const source = getSelectedSource();
+            const badge = document.getElementById('sourceBadge');
+            if (source === 'elektromer') {
+                badge.textContent = '● Elektroměr Sázava';
+                badge.className = 'source-badge elektromer';
+            } else {
+                badge.textContent = '● Shelly Sázava';
+                badge.className = 'source-badge';
+            }
+            // Zničit staré grafy, aby se reinicializovaly s novými daty
+            Object.values(charts).forEach(c => c.destroy());
+            charts = {};
+            sliders = {};
+            loadData();
+        }
         
         window.addEventListener('DOMContentLoaded', function() {
             updateCurrentTime();
@@ -437,7 +550,6 @@
             setInterval(loadData, AUTO_REFRESH_INTERVAL);
             const today = new Date().toISOString().split('T')[0];
             const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            // Nastavit všechny custom date inputy
             ['Overview', 'Aggregated', 'Statistics'].forEach(section => {
                 document.getElementById('customStartDate' + section).value = weekAgo;
                 document.getElementById('customEndDate' + section).value = today;
@@ -481,7 +593,10 @@
             document.getElementById('loading').style.display = 'block';
             document.getElementById('error').style.display = 'none';
             document.getElementById('success').style.display = 'none';
-            const url = PHP_DATA_URL + '?days=9999';
+
+            const source = getSelectedSource();
+            const url = PHP_DATA_URL + '?days=9999&source=' + source;
+
             try {
                 const response = await fetch(url);
                 if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -506,8 +621,9 @@
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('statsGrid').style.display = 'grid';
                 document.getElementById('chartsGrid').style.display = 'grid';
-                document.getElementById('lastUpdate').textContent = `Poslední aktualizace: ${formatDateTime(new Date())} | Energie: ${rawData.length} záznamů | Spotřeba: ${spotrebaData.length} záznamů`;
-                document.getElementById('success').textContent = `✅ Úspěšně načteno ${rawData.length} měření energie a ${spotrebaData.length} měření spotřeby!`;
+                const sourceLabel = source === 'elektromer' ? 'Elektroměr Sázava' : 'Shelly Sázava';
+                document.getElementById('lastUpdate').textContent = `Zdroj: ${sourceLabel} | Poslední aktualizace: ${formatDateTime(new Date())} | Energie: ${rawData.length} záznamů | Spotřeba: ${spotrebaData.length} záznamů`;
+                document.getElementById('success').textContent = `✅ [${sourceLabel}] Načteno ${rawData.length} měření energie a ${spotrebaData.length} měření spotřeby!`;
                 document.getElementById('success').style.display = 'block';
                 setTimeout(() => { document.getElementById('success').style.display = 'none'; }, 5000);
                 if (Object.keys(charts).length === 0) { 
@@ -515,7 +631,6 @@
                     initializeSliders(); 
                     initializeAggregatedSliders(); 
                 }
-                // Aktualizovat všechny sekce
                 updateSection('overview');
                 updateSection('aggregated');
                 updateSection('statistics');
@@ -555,17 +670,13 @@
             
             const fd = rawData.filter(d => d.datetime >= cutoff);
             const fs = spotrebaData.filter(d => d.datetime >= cutoff);
-            
-            // Přepočítat kumulativní spotřebu
             let cum = 0;
             fs.forEach(d => { cum += d.spotreba; d.kumulativniSpotrebaKwh = cum; });
-            
             return { filteredData: fd, filteredSpotreba: fs };
         }
         
         function updateSection(section) {
             const { filteredData, filteredSpotreba } = filterDataForSection(section);
-            
             if (section === 'overview') {
                 filteredDataOverview = filteredData;
                 filteredSpotrebaOverview = filteredSpotreba;
@@ -587,34 +698,24 @@
         function resetOverviewSliders() {
             ['delta', 'consumption', 'power', 'voltage', 'current'].forEach(name => {
                 const sw = document.getElementById(`${name}SliderWindow`);
-                if (sw) { 
-                    sw.style.left = '0%'; 
-                    sw.style.width = '100%'; 
-                    sw.style.right = ''; 
-                }
+                if (sw) { sw.style.left = '0%'; sw.style.width = '100%'; sw.style.right = ''; }
             });
         }
         
         function resetAggregatedSliders() {
             ['daily', 'monthly', 'yearly'].forEach(name => {
                 const sw = document.getElementById(`${name}SliderWindow`);
-                if (sw) { 
-                    sw.style.left = '0%'; 
-                    sw.style.width = '100%'; 
-                    sw.style.right = ''; 
-                }
+                if (sw) { sw.style.left = '0%'; sw.style.width = '100%'; sw.style.right = ''; }
             });
         }
         
         function updateStats() {
             const pricePerKwh = parseFloat(document.getElementById('pricePerKwhOverview')?.value || 4.5);
             const data = filteredDataOverview, sdata = filteredSpotrebaOverview;
-            
             if (!data.length || !sdata.length) {
                 document.getElementById('statsGrid').innerHTML = '<p style="color:rgba(255,255,255,0.6);">Nedostatek dat pro vybrané období</p>';
                 return;
             }
-            
             const vykon = calcStatsWithTime(data.map(d => ({ value: d.vykonW, time: d.datetime })));
             const napeti = calcStatsWithTime(data.map(d => ({ value: d.napeti, time: d.datetime })));
             const proud = calcStatsWithTime(data.map(d => ({ value: d.proud, time: d.datetime })));
@@ -679,9 +780,7 @@
         
         function updateAllCharts() {
             const data = filteredDataOverview, sdata = filteredSpotrebaOverview;
-            
             if (!data.length && !sdata.length) return;
-            
             charts.consumption.data.datasets = [{ label: 'Kumulativní spotřeba (kWh)', data: sdata.map(d => ({ x: d.datetime, y: d.kumulativniSpotrebaKwh })), borderColor: '#4caf50', backgroundColor: 'rgba(76, 175, 80, 0.2)', tension: 0.4, fill: true, pointRadius: 2 }];
             charts.consumption.options.scales.x.min = undefined; charts.consumption.options.scales.x.max = undefined;
             const deltaData = sdata.filter(d => d.spotreba > 0).map(d => ({ x: d.datetime, y: d.spotreba }));
@@ -740,16 +839,9 @@
             charts.yearlyConsumption.data = { labels: Object.keys(yearly), datasets: [{ label: 'Spotřeba (kWh)', data: Object.values(yearly), backgroundColor: 'rgba(156,39,176,0.8)', borderColor: 'rgba(156,39,176,1)', borderWidth: 1 }] };
             charts.yearlyConsumption.originalData = JSON.parse(JSON.stringify(charts.yearlyConsumption.data));
             charts.yearlyConsumption.update();
-            
-            if (charts.dailyConsumption.originalData && charts.dailyConsumption.originalData.datasets[0]) {
-                drawBarSliderPreview('daily', charts.dailyConsumption.originalData.datasets[0].data);
-            }
-            if (charts.monthlyConsumption.originalData && charts.monthlyConsumption.originalData.datasets[0]) {
-                drawBarSliderPreview('monthly', charts.monthlyConsumption.originalData.datasets[0].data);
-            }
-            if (charts.yearlyConsumption.originalData && charts.yearlyConsumption.originalData.datasets[0]) {
-                drawBarSliderPreview('yearly', charts.yearlyConsumption.originalData.datasets[0].data);
-            }
+            if (charts.dailyConsumption.originalData?.datasets[0]) drawBarSliderPreview('daily', charts.dailyConsumption.originalData.datasets[0].data);
+            if (charts.monthlyConsumption.originalData?.datasets[0]) drawBarSliderPreview('monthly', charts.monthlyConsumption.originalData.datasets[0].data);
+            if (charts.yearlyConsumption.originalData?.datasets[0]) drawBarSliderPreview('yearly', charts.yearlyConsumption.originalData.datasets[0].data);
         }
         
         function updateStatistics() {
@@ -803,7 +895,7 @@
             const avgMatrix = matrix.map(day => day.map(h => h.length > 0 ? h.reduce((a,b)=>a+b,0)/h.length : null));
             const allPowers = avgMatrix.flat().filter(p => p !== null);
             if (!allPowers.length) { document.getElementById('heatmapGrid').innerHTML = '<p style="color:rgba(255,255,255,0.6);padding:20px;">Nedostatek dat pro heatmapu v roce ' + selectedYear + '</p>'; return; }
-            const minP = Math.min(...allPowers), maxPOriginal = Math.max(...allPowers);
+            const minP = Math.min(...allPowers);
             const sortedPowers = [...allPowers].sort((a, b) => a - b);
             const percentileIndex = Math.floor(sortedPowers.length * (colorScalePercent / 100)) - 1;
             const maxP = sortedPowers[Math.max(0, percentileIndex)];
@@ -912,30 +1004,21 @@
                     s.window.style.left = nl.toFixed(2)+'%'; s.window.style.width = s.startWidth.toFixed(2)+'%'; s.window.style.right = '';
                 } else if (s.isResizing) {
                     if (s.resizeHandle === 'left') {
-                        let nl = s.startLeft + dp;
-                        let nw = s.startWidth - dp;
+                        let nl = s.startLeft + dp, nw = s.startWidth - dp;
                         if (nw < 15) { nw = 15; nl = s.startRight - 15; }
                         nl = Math.max(0, nl);
                         if (nl + nw > 100) { nl = 100 - nw; }
-                        s.window.style.left = nl.toFixed(2)+'%'; 
-                        s.window.style.width = nw.toFixed(2)+'%'; 
-                        s.window.style.right = '';
+                        s.window.style.left = nl.toFixed(2)+'%'; s.window.style.width = nw.toFixed(2)+'%'; s.window.style.right = '';
                     } else {
-                        let nw = s.startWidth + dp;
-                        nw = Math.max(15, nw);
-                        nw = Math.min(100 - s.startLeft, nw);
-                        s.window.style.width = nw.toFixed(2)+'%'; 
-                        s.window.style.right = '';
+                        let nw = Math.max(15, Math.min(100 - s.startLeft, s.startWidth + dp));
+                        s.window.style.width = nw.toFixed(2)+'%'; s.window.style.right = '';
                     }
                 }
                 needsUpdate = true; updateName = name;
             });
             if (needsUpdate && updateName) {
-                if (['daily', 'monthly', 'yearly'].includes(updateName)) {
-                    updateAggregatedChartFromSlider(updateName);
-                } else {
-                    updateChartFromSlider(updateName);
-                }
+                if (['daily', 'monthly', 'yearly'].includes(updateName)) updateAggregatedChartFromSlider(updateName);
+                else updateChartFromSlider(updateName);
             }
         }
         
@@ -1003,24 +1086,18 @@
         
         function resetAggregatedSlider(type) {
             const sw = document.getElementById(`${type}SliderWindow`);
-            if (sw) {
-                sw.style.left = '0%';
-                sw.style.width = '100%';
-                sw.style.right = '';
-            }
+            if (sw) { sw.style.left = '0%'; sw.style.width = '100%'; sw.style.right = ''; }
             let chart;
             if (type === 'daily') chart = charts.dailyConsumption;
             else if (type === 'monthly') chart = charts.monthlyConsumption;
             else if (type === 'yearly') chart = charts.yearlyConsumption;
-            
             if (chart && chart.originalData) {
                 chart.data = JSON.parse(JSON.stringify(chart.originalData));
                 chart.update('none');
             }
-            
             const startEl = document.getElementById(`${type}SliderStart`);
             const endEl = document.getElementById(`${type}SliderEnd`);
-            if (chart && chart.originalData && chart.originalData.labels.length > 0) {
+            if (chart?.originalData?.labels?.length > 0) {
                 if (startEl) startEl.textContent = chart.originalData.labels[0];
                 if (endEl) endEl.textContent = chart.originalData.labels[chart.originalData.labels.length - 1];
             }
@@ -1029,14 +1106,12 @@
         function initializeAggregatedSliders() {
             const names = ['daily','monthly','yearly'];
             names.forEach(name => {
-                const sw = document.getElementById(`${name}SliderWindow`);
-                const sl = document.getElementById(`${name}Slider`);
+                const sw = document.getElementById(`${name}SliderWindow`), sl = document.getElementById(`${name}Slider`);
                 if (!sw || !sl) return;
                 sliders[name] = { window: sw, slider: sl, isDragging: false, isResizing: false, resizeHandle: null, startX: 0, startLeft: 0, startWidth: 0, startRight: 0 };
                 sw.style.left = '0%'; sw.style.width = '100%'; sw.style.right = '';
                 sw.addEventListener('mousedown', e => { if (!e.target.classList.contains('chart-slider-handle')) handleAggSliderMouseDown(e, name); });
-                const lh = sw.querySelector('.chart-slider-handle.left');
-                const rh = sw.querySelector('.chart-slider-handle.right');
+                const lh = sw.querySelector('.chart-slider-handle.left'), rh = sw.querySelector('.chart-slider-handle.right');
                 if (lh) lh.addEventListener('mousedown', e => handleAggResizeStart(e, name, 'left'));
                 if (rh) rh.addEventListener('mousedown', e => handleAggResizeStart(e, name, 'right'));
             });
@@ -1062,54 +1137,32 @@
         }
         
         function updateAggregatedChartFromSlider(name) {
-            const s = sliders[name];
-            if (!s) return;
+            const s = sliders[name]; if (!s) return;
             const pr = s.slider.getBoundingClientRect(), wr = s.window.getBoundingClientRect();
-            const lp = ((wr.left - pr.left) / pr.width) * 100;
-            const wp = (wr.width / pr.width) * 100;
-            const rp = lp + wp;
-            
+            const lp = ((wr.left - pr.left) / pr.width) * 100, wp = (wr.width / pr.width) * 100, rp = lp + wp;
             let chart;
             if (name === 'daily') chart = charts.dailyConsumption;
             else if (name === 'monthly') chart = charts.monthlyConsumption;
             else if (name === 'yearly') chart = charts.yearlyConsumption;
-            
-            if (!chart || !chart.originalData || !chart.originalData.labels || !chart.originalData.labels.length) return;
-            
+            if (!chart?.originalData?.labels?.length) return;
             const totalItems = chart.originalData.labels.length;
             const si = Math.max(0, Math.floor((lp/100) * totalItems));
             const ei = Math.min(totalItems, Math.ceil((rp/100) * totalItems));
-            
             const slicedLabels = chart.originalData.labels.slice(si, ei);
             const slicedData = chart.originalData.datasets[0].data.slice(si, ei);
-            
             if (!slicedLabels.length) return;
-            
-            chart.data = {
-                labels: slicedLabels,
-                datasets: [{
-                    label: chart.originalData.datasets[0].label,
-                    data: slicedData,
-                    backgroundColor: chart.originalData.datasets[0].backgroundColor,
-                    borderColor: chart.originalData.datasets[0].borderColor,
-                    borderWidth: chart.originalData.datasets[0].borderWidth
-                }]
-            };
-            
+            chart.data = { labels: slicedLabels, datasets: [{ label: chart.originalData.datasets[0].label, data: slicedData, backgroundColor: chart.originalData.datasets[0].backgroundColor, borderColor: chart.originalData.datasets[0].borderColor, borderWidth: chart.originalData.datasets[0].borderWidth }] };
             chart.update('none');
-            
-            const startEl = document.getElementById(`${name}SliderStart`);
-            const endEl = document.getElementById(`${name}SliderEnd`);
+            const startEl = document.getElementById(`${name}SliderStart`), endEl = document.getElementById(`${name}SliderEnd`);
             if (startEl) startEl.textContent = slicedLabels[0];
             if (endEl) endEl.textContent = slicedLabels[slicedLabels.length - 1];
         }
         
         function drawBarSliderPreview(name, dataValues) {
             const canvas = document.getElementById(`${name}SliderPreview`);
-            if (!canvas || !dataValues || !dataValues.length) return;
+            if (!canvas || !dataValues?.length) return;
             const ctx = canvas.getContext('2d');
-            const w = canvas.width = canvas.offsetWidth * 2;
-            const h = canvas.height = canvas.offsetHeight * 2;
+            const w = canvas.width = canvas.offsetWidth * 2, h = canvas.height = canvas.offsetHeight * 2;
             ctx.clearRect(0, 0, w, h);
             const max = Math.max(...dataValues);
             if (max === 0) return;
@@ -1117,9 +1170,7 @@
             ctx.fillStyle = '#667eea';
             dataValues.forEach((val, i) => {
                 const barHeight = (val / max) * h * 0.8;
-                const x = i * barWidth;
-                const y = h - barHeight;
-                ctx.fillRect(x, y, barWidth * 0.8, barHeight);
+                ctx.fillRect(i * barWidth, h - barHeight, barWidth * 0.8, barHeight);
             });
         }
     </script>
