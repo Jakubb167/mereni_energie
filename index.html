@@ -176,11 +176,418 @@
         .cost-value { font-size: 1.8em; font-weight: bold; color: #ffc107; margin: 5px 0; }
         .page-title { font-size: 2em; margin-bottom: 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #f093fb 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
         @media (max-width: 768px) { h1 { font-size: 2em; } .chart-grid { grid-template-columns: 1fr; } .stats-grid { grid-template-columns: 1fr; } .stat-value { font-size: 2.2em; } }
+
+        /* ── DIAGRAM ── */
+        .diagram-outer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 30px;
+            padding-bottom: 40px;
+        }
+        .diagram-title {
+            font-size: 2em;
+            margin-bottom: 0;
+            text-align: center;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fcd34d 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .diagram-subtitle {
+            color: rgba(255,255,255,0.55);
+            text-align: center;
+            font-size: 0.95em;
+            margin-top: -20px;
+        }
+        .diagram-wrapper {
+            width: 100%;
+            max-width: 900px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 24px;
+            padding: 30px 20px;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+            backdrop-filter: blur(12px);
+        }
+        .diagram-svg-container {
+            width: 100%;
+            overflow: visible;
+        }
+        /* animated power flow */
+        @keyframes flowRight {
+            0%   { stroke-dashoffset: 40; }
+            100% { stroke-dashoffset: 0; }
+        }
+        @keyframes flowDown {
+            0%   { stroke-dashoffset: 40; }
+            100% { stroke-dashoffset: 0; }
+        }
+        .flow-line-active {
+            stroke-dasharray: 12 8;
+            animation: flowRight 0.6s linear infinite;
+        }
+        .flow-line-active-v {
+            stroke-dasharray: 12 8;
+            animation: flowDown 0.6s linear infinite;
+        }
+        .flow-line-idle {
+            stroke-dasharray: 6 6;
+            opacity: 0.3;
+        }
+        /* metric panels */
+        .diag-metric-panel {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 16px;
+            padding: 18px 22px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            min-width: 130px;
+            transition: box-shadow 0.3s, border-color 0.3s;
+        }
+        .diag-metric-panel:hover {
+            box-shadow: 0 0 20px rgba(251,191,36,0.2);
+            border-color: rgba(251,191,36,0.3);
+        }
+        .diag-metric-icon { font-size: 1.6em; }
+        .diag-metric-label {
+            font-size: 0.7em;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: rgba(255,255,255,0.5);
+        }
+        .diag-metric-value {
+            font-size: 1.65em;
+            font-weight: 700;
+            color: #fbbf24;
+            font-variant-numeric: tabular-nums;
+        }
+        .diag-metric-value.blue  { color: #60a5fa; }
+        .diag-metric-value.green { color: #4ade80; }
+        .diag-metric-value.purple{ color: #c084fc; }
+        .diag-metric-sub {
+            font-size: 0.72em;
+            color: rgba(255,255,255,0.4);
+        }
+        .diag-metrics-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+            max-width: 900px;
+        }
+        .diag-status-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+            max-width: 900px;
+        }
+        .diag-status-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 18px;
+            border-radius: 30px;
+            font-size: 0.82em;
+            font-weight: 600;
+            border: 1px solid;
+        }
+        .diag-status-pill.ok   { background: rgba(74,222,128,0.1); border-color: rgba(74,222,128,0.3); color: #4ade80; }
+        .diag-status-pill.warn { background: rgba(251,191,36,0.1); border-color: rgba(251,191,36,0.3); color: #fbbf24; }
+        .diag-status-pill.off  { background: rgba(148,163,184,0.1); border-color: rgba(148,163,184,0.2); color: rgba(255,255,255,0.4); }
+        .diag-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .diag-dot.ok   { background: #4ade80; box-shadow: 0 0 6px #4ade80; animation: pulse 2s infinite; }
+        .diag-dot.warn { background: #fbbf24; box-shadow: 0 0 6px #fbbf24; animation: pulse 1.2s infinite; }
+        .diag-dot.off  { background: rgba(148,163,184,0.4); }
+        .diag-last-update {
+            font-size: 0.78em;
+            color: rgba(255,255,255,0.35);
+            text-align: center;
+        }
+        /* ── END DIAGRAM ── */
+
+        /* ══════════════════════════════════════
+           DIAGRAM — LIGHT THEME OVERRIDES
+        ══════════════════════════════════════ */
+        /* CSS proměnné pro diagram SVG texty a prvky */
+        :root {
+            --diag-text: rgba(255,255,255,0.75);
+            --diag-text-label: rgba(255,255,255,0.65);
+            --diag-text-strong: #fff;
+            --diag-wire-idle: 0.3;
+            --diag-svg-bg: #0d1b2a;
+            --diag-shelly-body: #1e2d40;
+            --diag-shelly-border: rgba(96,165,250,0.6);
+            --diag-din-rail: #2a3848;
+            --diag-din-slot: #1e2a38;
+            --diag-bus-label: rgba(255,255,255,0.45);
+            --diag-n-label: rgba(96,165,250,0.8);
+            --diag-metric-bg: rgba(255,255,255,0.06);
+            --diag-metric-border: rgba(255,255,255,0.12);
+            --diag-metric-label: rgba(255,255,255,0.5);
+            --diag-metric-sub: rgba(255,255,255,0.4);
+            --diag-pill-off-color: rgba(255,255,255,0.4);
+            --diag-last-update: rgba(255,255,255,0.35);
+            --diag-wrapper-bg: rgba(255,255,255,0.03);
+            --diag-wrapper-border: rgba(255,255,255,0.08);
+        }
+        body.light-theme {
+            --diag-text: rgba(15,25,45,0.85);
+            --diag-text-label: rgba(15,25,45,0.65);
+            --diag-text-strong: #0f1929;
+            --diag-wire-idle: 0.45;
+            --diag-svg-bg: #d0daea;
+            --diag-shelly-body: #b8c8dc;
+            --diag-shelly-border: rgba(37,99,235,0.5);
+            --diag-din-rail: #8898aa;
+            --diag-din-slot: #9aaabb;
+            --diag-bus-label: rgba(15,25,45,0.45);
+            --diag-n-label: rgba(37,99,235,0.85);
+            --diag-metric-bg: rgba(255,255,255,0.7);
+            --diag-metric-border: rgba(0,0,0,0.12);
+            --diag-metric-label: rgba(15,25,45,0.55);
+            --diag-metric-sub: rgba(15,25,45,0.45);
+            --diag-pill-off-color: rgba(15,25,45,0.45);
+            --diag-last-update: rgba(15,25,45,0.4);
+            --diag-wrapper-bg: rgba(255,255,255,0.45);
+            --diag-wrapper-border: rgba(0,0,0,0.1);
+        }
+
+        /* Diagram wrapper */
+        .diagram-wrapper {
+            background: var(--diag-wrapper-bg) !important;
+            border-color: var(--diag-wrapper-border) !important;
+        }
+
+        /* Metric panels */
+        .diag-metric-panel {
+            background: var(--diag-metric-bg) !important;
+            border-color: var(--diag-metric-border) !important;
+        }
+        .diag-metric-label { color: var(--diag-metric-label) !important; }
+        .diag-metric-sub   { color: var(--diag-metric-sub) !important; }
+
+        /* Status pills */
+        .diag-status-pill.off { color: var(--diag-pill-off-color) !important; }
+
+        /* Last update text */
+        .diag-last-update { color: var(--diag-last-update) !important; }
+
+        /* SVG diagram — texty a plochy přes CSS custom properties */
+        /* Popisky pod jističi a ostatní SVG texty obarvíme přes fill na elementech;
+           ty co jsou inline fill="rgba(255,255,255,...)" přepíšeme přes třídy */
+        body.light-theme .diagram-svg-container text {
+            fill: var(--diag-text) !important;
+        }
+        /* Ale štítky na jističích (bílý rect + tmavý text) necháme — ty mají fill="#182028" */
+        body.light-theme .diagram-svg-container text[fill="#182028"],
+        body.light-theme .diagram-svg-container text[fill="#1a2030"],
+        body.light-theme .diagram-svg-container text[fill="#0a1020"] {
+            fill: #182028 !important;
+        }
+        /* Hodnoty metrik (žlutá/modrá/zelená) necháme barevné */
+        body.light-theme .diagram-svg-container text[fill="#fbbf24"],
+        body.light-theme .diagram-svg-container text[fill="#4ade80"],
+        body.light-theme .diagram-svg-container text[fill="#60a5fa"],
+        body.light-theme .diagram-svg-container text[fill="#c084fc"],
+        body.light-theme .diagram-svg-container text[fill="#ef4444"],
+        body.light-theme .diagram-svg-container text[fill="#ccd4dc"],
+        body.light-theme .diagram-svg-container text[fill="#ffe0e0"],
+        body.light-theme .diagram-svg-container text[fill="#e0e8f0"],
+        body.light-theme .diagram-svg-container text[fill="#d0d8e0"] {
+            fill: inherit !important;
+        }
+        /* SVG pozadí diagramu */
+        body.light-theme .diagram-svg-container rect[fill="#0d1b2a"],
+        body.light-theme .diagram-svg-container rect[fill="#0a1220"] {
+            fill: var(--diag-svg-bg) !important;
+        }
+        /* DIN lišta */
+        body.light-theme .diagram-svg-container rect[fill="#1e2a38"],
+        body.light-theme .diagram-svg-container rect[fill="#2a3848"],
+        body.light-theme .diagram-svg-container rect[fill="#1a2535"],
+        body.light-theme .diagram-svg-container rect[fill="#263040"] {
+            fill: #8898aa !important;
+        }
+        /* Shelly tělo */
+        body.light-theme .diagram-svg-container rect[fill="#1e2d40"],
+        body.light-theme .diagram-svg-container rect[fill="#162030"],
+        body.light-theme .diagram-svg-container rect[fill="#0d1828"] {
+            fill: #b8c8dc !important;
+        }
+        /* Metrické panely v SVG (tmavé rámečky) */
+        body.light-theme .diagram-svg-container rect[fill="#0a0e18"],
+        body.light-theme .diagram-svg-container rect[fill="#060a14"],
+        body.light-theme .diagram-svg-container rect[fill="#080c16"] {
+            fill: rgba(255,255,255,0.7) !important;
+        }
+        /* Idle vodiče — zvýšíme opacitu ve světlém režimu */
+        body.light-theme .flow-line-idle { opacity: 0.6 !important; }
+
+        /* Metrické karty nad diagramem */
+        body.light-theme .diag-metric-card {
+            background: rgba(255,255,255,0.65) !important;
+            border-color: rgba(0,0,0,0.12) !important;
+        }
+        body.light-theme .diag-metric-card--neutral {
+            background: rgba(255,255,255,0.5) !important;
+            border-color: rgba(0,0,0,0.1) !important;
+        }
+        body.light-theme .diag-metric-card-label { color: rgba(15,25,45,0.5) !important; }
+        body.light-theme .diag-time-value         { color: rgba(15,25,45,0.6) !important; }
+
+        /* ── END DIAGRAM LIGHT THEME ── */
+
+        /* ══════════════════════════════════════
+           LIGHT / DARK THEME
+        ══════════════════════════════════════ */
+        :root {
+            --bg-gradient-a: #1a1a2e;
+            --bg-gradient-b: #16213e;
+            --text-primary: #fff;
+            --text-secondary: rgba(255,255,255,0.6);
+            --text-muted: rgba(255,255,255,0.5);
+            --card-bg: rgba(255,255,255,0.05);
+            --card-border: rgba(255,255,255,0.1);
+            --card-shadow: rgba(0,0,0,0.3);
+            --header-bg: rgba(255,255,255,0.05);
+            --filter-bg: rgba(255,255,255,0.1);
+            --filter-border: rgba(255,255,255,0.2);
+            --select-opt-bg: #1a1a2e;
+            --input-colorscheme: dark;
+            --nav-tab-bg: rgba(255,255,255,0.05);
+            --nav-tab-border: rgba(255,255,255,0.1);
+            --last-update-color: rgba(255,255,255,0.7);
+            --diagram-bg: #0d1b2a;
+            --diagram-border: rgba(100,130,160,0.25);
+        }
+        body.light-theme {
+            --bg-gradient-a: #e8edf5;
+            --bg-gradient-b: #d4dcea;
+            --text-primary: #111827;
+            --text-secondary: rgba(0,0,0,0.55);
+            --text-muted: rgba(0,0,0,0.4);
+            --card-bg: rgba(255,255,255,0.75);
+            --card-border: rgba(0,0,0,0.08);
+            --card-shadow: rgba(0,0,0,0.12);
+            --header-bg: rgba(255,255,255,0.7);
+            --filter-bg: rgba(255,255,255,0.6);
+            --filter-border: rgba(0,0,0,0.15);
+            --select-opt-bg: #f0f4fa;
+            --input-colorscheme: light;
+            --nav-tab-bg: rgba(255,255,255,0.5);
+            --nav-tab-border: rgba(0,0,0,0.1);
+            --last-update-color: rgba(0,0,0,0.55);
+            --diagram-bg: #c8d4e0;
+            --diagram-border: rgba(80,100,130,0.3);
+        }
+        body {
+            background: linear-gradient(135deg, var(--bg-gradient-a) 0%, var(--bg-gradient-b) 100%);
+            color: var(--text-primary);
+        }
+        header {
+            background: var(--header-bg) !important;
+            border-color: var(--card-border) !important;
+        }
+        h1 { /* gradient text stays */ }
+        .subtitle, .live-indicator span { color: var(--text-secondary) !important; }
+        .nav-tab {
+            background: var(--nav-tab-bg) !important;
+            border-color: var(--nav-tab-border) !important;
+            color: var(--text-primary) !important;
+        }
+        .last-update { color: var(--last-update-color) !important; }
+        .stat-card, .chart-container, .heatmap-container, .filters {
+            background: var(--card-bg) !important;
+            border-color: var(--card-border) !important;
+            box-shadow: 0 8px 32px var(--card-shadow) !important;
+        }
+        .stat-label { color: var(--text-secondary) !important; }
+        .stat-meta { color: var(--text-secondary) !important; }
+        .stat-timestamp { color: var(--text-muted) !important; }
+        .chart-container h2 { color: var(--text-primary) !important; }
+        .filters label, .heatmap-control-group label { color: var(--text-primary) !important; }
+        .filters select, .filters input, .heatmap-control-group select {
+            background: var(--filter-bg) !important;
+            border-color: var(--filter-border) !important;
+            color: var(--text-primary) !important;
+        }
+        .filters select option, .heatmap-control-group select option { background: var(--select-opt-bg) !important; color: var(--text-primary) !important; }
+        .filters input[type="date"] { color-scheme: var(--input-colorscheme) !important; }
+        .slider-labels span { color: var(--text-secondary) !important; }
+        .source-selector-label { color: var(--text-primary) !important; }
+        .source-selector select { color: var(--text-primary) !important; }
+        .source-selector select option { background: var(--select-opt-bg) !important; color: var(--text-primary) !important; }
+        .heatmap-y-label, .heatmap-month-label, .color-scale-info span { color: var(--text-secondary) !important; }
+        .diagram-svg-wrap { background: var(--diagram-bg) !important; border-color: var(--diagram-border) !important; }
+
+        /* ── THEME TOGGLE BUTTON ── */
+        .theme-toggle {
+            position: absolute;
+            top: 18px;
+            right: 22px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 30px;
+            padding: 7px 14px 7px 10px;
+            cursor: pointer;
+            font-size: 0.88em;
+            font-weight: 600;
+            color: var(--text-primary);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+            user-select: none;
+            z-index: 10;
+        }
+        .theme-toggle:hover {
+            border-color: rgba(102,126,234,0.6);
+            box-shadow: 0 0 14px rgba(102,126,234,0.25);
+        }
+        .theme-toggle-track {
+            width: 36px;
+            height: 20px;
+            border-radius: 10px;
+            background: #667eea;
+            position: relative;
+            transition: background 0.3s;
+            flex-shrink: 0;
+        }
+        body.light-theme .theme-toggle-track { background: #fbbf24; }
+        .theme-toggle-thumb {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #fff;
+            transition: transform 0.3s;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+        }
+        body.light-theme .theme-toggle-thumb { transform: translateX(16px); }
+        /* ── END THEME TOGGLE ── */
     </style>
 </head>
 <body>
     <div class="container">
-        <header>
+        <header style="position:relative;">
+            <!-- Přepínač světlý/tmavý vzhled -->
+            <div class="theme-toggle" onclick="toggleTheme()" title="Přepnout světlý/tmavý vzhled">
+                <span id="themeIcon">🌙</span>
+                <div class="theme-toggle-track">
+                    <div class="theme-toggle-thumb"></div>
+                </div>
+                <span id="themeLabel">Tmavý</span>
+            </div>
             <h1>⚡ Dashboard Spotřeby Energie</h1>
             <p class="subtitle">Real-time monitoring odběru elektrické energie</p>
             <div class="live-indicator"><div class="live-dot"></div><span>LIVE DATA - SQL Databáze</span></div>
@@ -204,6 +611,7 @@
                 <div class="nav-tab" data-page="aggregated" onclick="switchPage('aggregated', this)">📈 Agregovaná spotřeba</div>
                 <div class="nav-tab" data-page="statistics" onclick="switchPage('statistics', this)">📉 Detailní statistiky</div>
                 <div class="nav-tab" data-page="heatmap" onclick="switchPage('heatmap', this)">🔥 Heatmapa</div>
+                <div class="nav-tab nav-tab-diagram" id="diagramTab" data-page="diagram" onclick="switchPage('diagram', this)">⚡ Diagram</div>
             </div>
         </header>
         <div id="lastUpdate" class="last-update"></div>
@@ -508,6 +916,637 @@
                 </div>
             </div>
         </div>
+        <!-- DIAGRAM SEKCE -->
+        <div id="page-diagram" class="page-section">
+            <div class="diagram-outer">
+                <h2 class="diagram-title">&#x26A1; Sch&eacute;ma zapojen&iacute; &ndash; Elektrom&#283;r S&aacute;zava</h2>
+
+                <!-- Metriky -->
+                <div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-bottom:24px;" class="diag-metrics-inline">
+                    <div class="diag-metric-card" style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:12px;padding:10px 20px;text-align:center;">
+                        <div class="diag-metric-card-label" style="font-size:0.68em;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">V&yacute;kon</div>
+                        <div id="diagPower" style="font-size:1.65em;font-weight:700;color:#fbbf24;">--- W</div>
+                    </div>
+                    <div class="diag-metric-card" style="background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);border-radius:12px;padding:10px 20px;text-align:center;">
+                        <div class="diag-metric-card-label" style="font-size:0.68em;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Proud CT&#x2081;</div>
+                        <div id="diagCurrent" style="font-size:1.65em;font-weight:700;color:#4ade80;">--- A</div>
+                    </div>
+                    <div class="diag-metric-card" style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.3);border-radius:12px;padding:10px 20px;text-align:center;">
+                        <div class="diag-metric-card-label" style="font-size:0.68em;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Nap&#283;t&iacute; L&ndash;N</div>
+                        <div id="diagVoltage" style="font-size:1.65em;font-weight:700;color:#60a5fa;">--- V</div>
+                    </div>
+                    <div class="diag-metric-card" style="background:rgba(192,132,252,0.1);border:1px solid rgba(192,132,252,0.3);border-radius:12px;padding:10px 20px;text-align:center;">
+                        <div class="diag-metric-card-label" style="font-size:0.68em;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Spot&#345;eba</div>
+                        <div id="diagSpotreba" style="font-size:1.65em;font-weight:700;color:#c084fc;">--- kWh</div>
+                    </div>
+                    <div class="diag-metric-card diag-metric-card--neutral" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:10px 20px;text-align:center;">
+                        <div class="diag-metric-card-label" style="font-size:0.68em;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">&#268;as m&#283;&#345;en&iacute;</div>
+                        <div id="diagPowerTime" class="diag-time-value" style="font-size:1.1em;font-weight:600;color:rgba(255,255,255,0.5);">--:--:--</div>
+                    </div>
+                </div>
+
+                <div class="diagram-wrapper" style="max-width:980px;overflow-x:auto;">
+                  <svg id="diagramSVG" class="diagram-svg-container" viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg"
+                       style="width:100%;min-width:580px;height:auto;display:block;">
+                    <defs>
+                      <filter id="gg" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="3" result="b"/>
+                        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                      </filter>
+                      <filter id="gb" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="2" result="b"/>
+                        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                      </filter>
+                      <filter id="gy" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="2.5" result="b"/>
+                        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                      </filter>
+                      <filter id="shadow-cb" x="-30%" y="-20%" width="160%" height="160%">
+                        <feDropShadow dx="2" dy="3" stdDeviation="3" flood-color="rgba(0,0,0,0.7)"/>
+                      </filter>
+                      <marker id="aW" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+                        <polygon points="0 0,7 2.5,0 5" fill="#667eea"/>
+                      </marker>
+                      <marker id="aB" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+                        <polygon points="0 0,7 2.5,0 5" fill="#60a5fa"/>
+                      </marker>
+                      <marker id="aP" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+                        <polygon points="0 0,7 2.5,0 5" fill="#c084fc"/>
+                      </marker>
+                      <marker id="aG" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+                        <polygon points="0 0,7 2.5,0 5" fill="#4ade80"/>
+                      </marker>
+                      <!-- Jistič — gradients pro 3D efekt -->
+                      <linearGradient id="cbBody" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%"   stop-color="#1c2e50"/>
+                        <stop offset="30%"  stop-color="#243560"/>
+                        <stop offset="70%"  stop-color="#1a2845"/>
+                        <stop offset="100%" stop-color="#111d35"/>
+                      </linearGradient>
+                      <linearGradient id="cbFace" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%"   stop-color="#0f1c30"/>
+                        <stop offset="50%"  stop-color="#0a1422"/>
+                        <stop offset="100%" stop-color="#080f1a"/>
+                      </linearGradient>
+                      <linearGradient id="cbLever" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%"   stop-color="#2a4a90"/>
+                        <stop offset="40%"  stop-color="#1e3870"/>
+                        <stop offset="100%" stop-color="#142855"/>
+                      </linearGradient>
+                      <linearGradient id="cbLeverBtn" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%"   stop-color="#5080d0"/>
+                        <stop offset="50%"  stop-color="#3860b0"/>
+                        <stop offset="100%" stop-color="#2a4a90"/>
+                      </linearGradient>
+                      <linearGradient id="cbScrew" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%"   stop-color="#8ab0d0"/>
+                        <stop offset="50%"  stop-color="#5a7a9a"/>
+                        <stop offset="100%" stop-color="#3a5a7a"/>
+                      </linearGradient>
+                      <radialGradient id="cbScrewHead" cx="35%" cy="35%" r="65%">
+                        <stop offset="0%"   stop-color="#aad0f0"/>
+                        <stop offset="60%"  stop-color="#6090b8"/>
+                        <stop offset="100%" stop-color="#304060"/>
+                      </radialGradient>
+                      <linearGradient id="cbTerminal" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%"   stop-color="#607090"/>
+                        <stop offset="50%"  stop-color="#405070"/>
+                        <stop offset="100%" stop-color="#2a3a50"/>
+                      </linearGradient>
+                      <!-- Hlavní jistič — větší, červený highlight -->
+                      <linearGradient id="cbBodyMain" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%"   stop-color="#251520"/>
+                        <stop offset="30%"  stop-color="#2e1828"/>
+                        <stop offset="70%"  stop-color="#221218"/>
+                        <stop offset="100%" stop-color="#180c10"/>
+                      </linearGradient>
+                      <linearGradient id="cbLeverMain" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%"   stop-color="#903030"/>
+                        <stop offset="40%"  stop-color="#702020"/>
+                        <stop offset="100%" stop-color="#501010"/>
+                      </linearGradient>
+                      <linearGradient id="cbLeverBtnMain" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%"   stop-color="#d05050"/>
+                        <stop offset="50%"  stop-color="#a03030"/>
+                        <stop offset="100%" stop-color="#702020"/>
+                      </linearGradient>
+                    </defs>
+
+                    <!--
+                    PŘESNĚ PODLE NÁČRTU:
+                    Červená sběrnice y=100 od x=90 do x=730
+                    Z ní dolů 4 svislé čáry do 4 jističů:
+                      Kamery  cx=120  (vlevo)
+                      Světla  cx=230
+                      Zásuvky cx=340
+                      Bojler  cx=450
+                    Červená sběrnice pokračuje doprava ke CT kroužku (cx=580)
+                    a dál doprava k hlavnímu jističi (cx=740)
+                    CT kroužek: zelený vývod dolů ke svorce IA Shelly
+                    Shelly: x=540..640, y=120..420, svorky IA IB N L dole
+                    Ze svorky L jde červená čára doprava a dolů
+                    ke spodní svorce hlavního jističe (stejná červená)
+                    Ze svorky N jde modrá čára doleva
+                    -->
+
+                    <!-- ═══════════════════════════════════════
+                         PROUD+VÝKON BOX nad CT kroužkem (x=480)
+                         Smazán text "CT transformátor"
+                    ═══════════════════════════════════════ -->
+                    <!-- proud+výkon box přímo nad CT, vycentrovaný -->
+                    <rect x="390" y="18" width="180" height="52" rx="8"
+                          fill="rgba(3,12,3,0.97)" stroke="rgba(74,222,128,0.65)" stroke-width="1.6"/>
+                    <text x="402" y="33" fill="rgba(255,255,255,0.45)"
+                          font-size="8" font-family="monospace">PROUD (CT&#x2081; &#x2192; IA)</text>
+                    <text id="svgCurrent" x="402" y="52"
+                          fill="#4ade80" font-size="17" font-weight="bold" filter="url(#gg)">--- A</text>
+                    <text x="498" y="33" fill="rgba(255,255,255,0.45)"
+                          font-size="8" font-family="monospace">VÝKON</text>
+                    <text id="svgPower" x="566" y="52"
+                          fill="#fbbf24" font-size="17" font-weight="bold" filter="url(#gy)" text-anchor="end">--- W</text>
+                    <!-- šipka od boxu dolů ke CT kroužku -->
+                    <line x1="480" y1="70" x2="480" y2="104"
+                          stroke="#4ade80" stroke-width="1.5" opacity="0.5"/>
+
+                    <!-- ═══════════════════════════════════════
+                         PANEL SHELLY PM MINI — nad jističem Kamery
+                         Pořadí: PROUD vlevo, VÝKON vpravo (jako EM-50)
+                    ═══════════════════════════════════════ -->
+                    <rect x="60" y="18" width="120" height="52" rx="8"
+                          fill="rgba(10,10,40,0.97)" stroke="rgba(102,126,234,0.7)" stroke-width="1.6"/>
+                    <text x="120" y="33" text-anchor="middle"
+                          fill="rgba(102,126,234,0.8)" font-size="7.5" font-weight="bold" font-family="monospace">SHELLY PM MINI</text>
+                    <text x="70" y="47" fill="rgba(255,255,255,0.45)" font-size="7" font-family="monospace">PROUD</text>
+                    <text id="svgShellyCurrent" x="70" y="62"
+                          fill="#4ade80" font-size="14" font-weight="bold" filter="url(#gg)">--- A</text>
+                    <text x="138" y="47" fill="rgba(255,255,255,0.45)" font-size="7" font-family="monospace">VÝKON</text>
+                    <text id="svgShellyPower" x="138" y="62"
+                          fill="#fbbf24" font-size="14" font-weight="bold" filter="url(#gy)">--- W</text>
+
+                    <!-- ═══════════════════════════════════════
+                         4 JISTIČE — realistický vzhled, rovnoměrné rozestupy
+                         Šířka=56, cx: 100, 200, 300, 400 (po 100px)
+                         y=180..390, napájení ze sběrnice y=130
+                    ═══════════════════════════════════════ -->
+
+                    <!-- ── makro: jeden jistič ──
+                         cx=střed, rating=text, label=popisek
+                    ──────────────────────────────────── -->
+
+                    <!-- ════════════════════════════════════════════════════
+                         MCB JISTIČE — věrné předloze (foto)
+                         Světle šedé tělo, velký křížový šroub nahoře/dole,
+                         bílý panel, plochá široká páčka s pruhem nahoře + ON
+                    ════════════════════════════════════════════════════ -->
+
+                    <!-- ════ Jistič Kamery B6  cx=100 ════ -->
+                    <g transform="translate(72,0)">
+                      <rect x="2" y="182" width="54" height="162" rx="4" fill="rgba(0,0,0,0.32)" filter="url(#shadow-cb)"/>
+                      <!-- Tělo světle šedé -->
+                      <rect x="0" y="180" width="54" height="162" rx="4" fill="#9aa5b0" stroke="#7a8a96" stroke-width="1.5"/>
+                      <rect x="0" y="180" width="3" height="162" rx="2" fill="rgba(255,255,255,0.28)"/>
+                      <rect x="51" y="180" width="3" height="162" rx="2" fill="rgba(0,0,0,0.14)"/>
+                      <!-- HORNÍ SVORKA -->
+                      <rect x="0" y="180" width="54" height="44" rx="4" fill="#8896a2" stroke="#6a7a86" stroke-width="1"/>
+                      <rect x="0" y="210" width="54" height="14" fill="#8896a2"/>
+                      <circle cx="27" cy="202" r="15" fill="#7a8a96" stroke="#58687a" stroke-width="1.8"/>
+                      <circle cx="27" cy="202" r="11" fill="#8fa0ae" stroke="#6a7a8a" stroke-width="1"/>
+                      <line x1="27" y1="193" x2="27" y2="211" stroke="#3a4a58" stroke-width="3.5" stroke-linecap="round"/>
+                      <line x1="18" y1="202" x2="36" y2="202" stroke="#3a4a58" stroke-width="3.5" stroke-linecap="round"/>
+                      <rect x="20" y="180" width="14" height="7" rx="2" fill="#2e3c48"/>
+                      <!-- BÍLÝ PANEL -->
+                      <rect x="4" y="224" width="46" height="92" rx="2" fill="#d8e0e8" stroke="#b8c8d4" stroke-width="1"/>
+                      <!-- Výčnělek páčky — tmavý pruh nahoře -->
+                      <rect x="7" y="228" width="40" height="13" rx="2" fill="#2a2a2a" stroke="#1a1a1a" stroke-width="0.8"/>
+                      <rect x="8" y="229" width="38" height="4" rx="1" fill="rgba(255,255,255,0.1)"/>
+                      <!-- Hlavní tělo páčky -->
+                      <rect x="7" y="239" width="40" height="46" rx="2" fill="#424242" stroke="#333" stroke-width="0.8"/>
+                      <rect x="8" y="240" width="38" height="16" rx="1" fill="rgba(255,255,255,0.06)"/>
+                      <rect x="8" y="256" width="38" height="28" rx="1" fill="rgba(0,0,0,0.1)"/>
+                      <rect x="8" y="240" width="4" height="44" rx="1" fill="rgba(255,255,255,0.08)"/>
+                      <text x="27" y="268" text-anchor="middle" fill="#ccd4dc" font-size="10" font-weight="bold" font-family="Arial,sans-serif" letter-spacing="1">ON</text>
+                      <!-- Štítek -->
+                      <rect x="8" y="290" width="38" height="14" rx="2" fill="#eef2f6" stroke="#c4d0da" stroke-width="0.8"/>
+                      <text x="27" y="301" text-anchor="middle" fill="#182028" font-size="9" font-weight="bold" font-family="Arial,sans-serif">B6</text>
+                      <!-- DOLNÍ SVORKA -->
+                      <rect x="0" y="316" width="54" height="26" rx="4" fill="#8896a2" stroke="#6a7a86" stroke-width="1"/>
+                      <rect x="0" y="316" width="54" height="6" fill="#8896a2"/>
+                      <circle cx="27" cy="329" r="10" fill="#7a8a96" stroke="#58687a" stroke-width="1.5"/>
+                      <circle cx="27" cy="329" r="7" fill="#8fa0ae" stroke="#6a7a8a" stroke-width="0.8"/>
+                      <line x1="27" y1="322" x2="27" y2="336" stroke="#3a4a58" stroke-width="3" stroke-linecap="round"/>
+                      <line x1="20" y1="329" x2="34" y2="329" stroke="#3a4a58" stroke-width="3" stroke-linecap="round"/>
+                      <rect x="20" y="335" width="14" height="7" rx="2" fill="#2e3c48"/>
+                    </g>
+                    <line x1="100" y1="342" x2="100" y2="380" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 3" opacity="0.5"/>
+                    <text x="100" y="396" text-anchor="middle" fill="rgba(255,255,255,0.65)" font-size="10" font-weight="600">kamery</text>
+
+                    <!-- ════ Jistič Světla B10  cx=200 ════ -->
+                    <g transform="translate(172,0)">
+                      <rect x="2" y="182" width="54" height="162" rx="4" fill="rgba(0,0,0,0.32)" filter="url(#shadow-cb)"/>
+                      <rect x="0" y="180" width="54" height="162" rx="4" fill="#9aa5b0" stroke="#7a8a96" stroke-width="1.5"/>
+                      <rect x="0" y="180" width="3" height="162" rx="2" fill="rgba(255,255,255,0.28)"/>
+                      <rect x="51" y="180" width="3" height="162" rx="2" fill="rgba(0,0,0,0.14)"/>
+                      <rect x="0" y="180" width="54" height="44" rx="4" fill="#8896a2" stroke="#6a7a86" stroke-width="1"/>
+                      <rect x="0" y="210" width="54" height="14" fill="#8896a2"/>
+                      <circle cx="27" cy="202" r="15" fill="#7a8a96" stroke="#58687a" stroke-width="1.8"/>
+                      <circle cx="27" cy="202" r="11" fill="#8fa0ae" stroke="#6a7a8a" stroke-width="1"/>
+                      <line x1="27" y1="193" x2="27" y2="211" stroke="#3a4a58" stroke-width="3.5" stroke-linecap="round"/>
+                      <line x1="18" y1="202" x2="36" y2="202" stroke="#3a4a58" stroke-width="3.5" stroke-linecap="round"/>
+                      <rect x="20" y="180" width="14" height="7" rx="2" fill="#2e3c48"/>
+                      <rect x="4" y="224" width="46" height="92" rx="2" fill="#d8e0e8" stroke="#b8c8d4" stroke-width="1"/>
+                      <rect x="7" y="228" width="40" height="13" rx="2" fill="#2a2a2a" stroke="#1a1a1a" stroke-width="0.8"/>
+                      <rect x="8" y="229" width="38" height="4" rx="1" fill="rgba(255,255,255,0.1)"/>
+                      <rect x="7" y="239" width="40" height="46" rx="2" fill="#424242" stroke="#333" stroke-width="0.8"/>
+                      <rect x="8" y="240" width="38" height="16" rx="1" fill="rgba(255,255,255,0.06)"/>
+                      <rect x="8" y="256" width="38" height="28" rx="1" fill="rgba(0,0,0,0.1)"/>
+                      <rect x="8" y="240" width="4" height="44" rx="1" fill="rgba(255,255,255,0.08)"/>
+                      <text x="27" y="268" text-anchor="middle" fill="#ccd4dc" font-size="10" font-weight="bold" font-family="Arial,sans-serif" letter-spacing="1">ON</text>
+                      <rect x="8" y="290" width="38" height="14" rx="2" fill="#eef2f6" stroke="#c4d0da" stroke-width="0.8"/>
+                      <text x="27" y="301" text-anchor="middle" fill="#182028" font-size="9" font-weight="bold" font-family="Arial,sans-serif">B10</text>
+                      <rect x="0" y="316" width="54" height="26" rx="4" fill="#8896a2" stroke="#6a7a86" stroke-width="1"/>
+                      <rect x="0" y="316" width="54" height="6" fill="#8896a2"/>
+                      <circle cx="27" cy="329" r="10" fill="#7a8a96" stroke="#58687a" stroke-width="1.5"/>
+                      <circle cx="27" cy="329" r="7" fill="#8fa0ae" stroke="#6a7a8a" stroke-width="0.8"/>
+                      <line x1="27" y1="322" x2="27" y2="336" stroke="#3a4a58" stroke-width="3" stroke-linecap="round"/>
+                      <line x1="20" y1="329" x2="34" y2="329" stroke="#3a4a58" stroke-width="3" stroke-linecap="round"/>
+                      <rect x="20" y="335" width="14" height="7" rx="2" fill="#2e3c48"/>
+                    </g>
+                    <line x1="200" y1="342" x2="200" y2="380" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 3" opacity="0.5"/>
+                    <text x="200" y="396" text-anchor="middle" fill="rgba(255,255,255,0.65)" font-size="10" font-weight="600">světla</text>
+
+                    <!-- ════ Jistič Zásuvky B16  cx=300 ════ -->
+                    <g transform="translate(272,0)">
+                      <rect x="2" y="182" width="54" height="162" rx="4" fill="rgba(0,0,0,0.32)" filter="url(#shadow-cb)"/>
+                      <rect x="0" y="180" width="54" height="162" rx="4" fill="#9aa5b0" stroke="#7a8a96" stroke-width="1.5"/>
+                      <rect x="0" y="180" width="3" height="162" rx="2" fill="rgba(255,255,255,0.28)"/>
+                      <rect x="51" y="180" width="3" height="162" rx="2" fill="rgba(0,0,0,0.14)"/>
+                      <rect x="0" y="180" width="54" height="44" rx="4" fill="#8896a2" stroke="#6a7a86" stroke-width="1"/>
+                      <rect x="0" y="210" width="54" height="14" fill="#8896a2"/>
+                      <circle cx="27" cy="202" r="15" fill="#7a8a96" stroke="#58687a" stroke-width="1.8"/>
+                      <circle cx="27" cy="202" r="11" fill="#8fa0ae" stroke="#6a7a8a" stroke-width="1"/>
+                      <line x1="27" y1="193" x2="27" y2="211" stroke="#3a4a58" stroke-width="3.5" stroke-linecap="round"/>
+                      <line x1="18" y1="202" x2="36" y2="202" stroke="#3a4a58" stroke-width="3.5" stroke-linecap="round"/>
+                      <rect x="20" y="180" width="14" height="7" rx="2" fill="#2e3c48"/>
+                      <rect x="4" y="224" width="46" height="92" rx="2" fill="#d8e0e8" stroke="#b8c8d4" stroke-width="1"/>
+                      <rect x="7" y="228" width="40" height="13" rx="2" fill="#2a2a2a" stroke="#1a1a1a" stroke-width="0.8"/>
+                      <rect x="8" y="229" width="38" height="4" rx="1" fill="rgba(255,255,255,0.1)"/>
+                      <rect x="7" y="239" width="40" height="46" rx="2" fill="#424242" stroke="#333" stroke-width="0.8"/>
+                      <rect x="8" y="240" width="38" height="16" rx="1" fill="rgba(255,255,255,0.06)"/>
+                      <rect x="8" y="256" width="38" height="28" rx="1" fill="rgba(0,0,0,0.1)"/>
+                      <rect x="8" y="240" width="4" height="44" rx="1" fill="rgba(255,255,255,0.08)"/>
+                      <text x="27" y="268" text-anchor="middle" fill="#ccd4dc" font-size="10" font-weight="bold" font-family="Arial,sans-serif" letter-spacing="1">ON</text>
+                      <rect x="8" y="290" width="38" height="14" rx="2" fill="#eef2f6" stroke="#c4d0da" stroke-width="0.8"/>
+                      <text x="27" y="301" text-anchor="middle" fill="#182028" font-size="9" font-weight="bold" font-family="Arial,sans-serif">B16</text>
+                      <rect x="0" y="316" width="54" height="26" rx="4" fill="#8896a2" stroke="#6a7a86" stroke-width="1"/>
+                      <rect x="0" y="316" width="54" height="6" fill="#8896a2"/>
+                      <circle cx="27" cy="329" r="10" fill="#7a8a96" stroke="#58687a" stroke-width="1.5"/>
+                      <circle cx="27" cy="329" r="7" fill="#8fa0ae" stroke="#6a7a8a" stroke-width="0.8"/>
+                      <line x1="27" y1="322" x2="27" y2="336" stroke="#3a4a58" stroke-width="3" stroke-linecap="round"/>
+                      <line x1="20" y1="329" x2="34" y2="329" stroke="#3a4a58" stroke-width="3" stroke-linecap="round"/>
+                      <rect x="20" y="335" width="14" height="7" rx="2" fill="#2e3c48"/>
+                    </g>
+                    <line x1="300" y1="342" x2="300" y2="380" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 3" opacity="0.5"/>
+                    <text x="300" y="396" text-anchor="middle" fill="rgba(255,255,255,0.65)" font-size="10" font-weight="600">zásuvky</text>
+
+                    <!-- ════ Jistič Bojler B15  cx=400  — šedá páčka ════ -->
+                    <g transform="translate(372,0)">
+                      <rect x="2" y="182" width="54" height="162" rx="4" fill="rgba(0,0,0,0.32)" filter="url(#shadow-cb)"/>
+                      <rect x="0" y="180" width="54" height="162" rx="4" fill="#9aa5b0" stroke="#7a8a96" stroke-width="1.5"/>
+                      <rect x="0" y="180" width="3" height="162" rx="2" fill="rgba(255,255,255,0.28)"/>
+                      <rect x="51" y="180" width="3" height="162" rx="2" fill="rgba(0,0,0,0.14)"/>
+                      <rect x="0" y="180" width="54" height="44" rx="4" fill="#8896a2" stroke="#6a7a86" stroke-width="1"/>
+                      <rect x="0" y="210" width="54" height="14" fill="#8896a2"/>
+                      <circle cx="27" cy="202" r="15" fill="#7a8a96" stroke="#58687a" stroke-width="1.8"/>
+                      <circle cx="27" cy="202" r="11" fill="#8fa0ae" stroke="#6a7a8a" stroke-width="1"/>
+                      <line x1="27" y1="193" x2="27" y2="211" stroke="#3a4a58" stroke-width="3.5" stroke-linecap="round"/>
+                      <line x1="18" y1="202" x2="36" y2="202" stroke="#3a4a58" stroke-width="3.5" stroke-linecap="round"/>
+                      <rect x="20" y="180" width="14" height="7" rx="2" fill="#2e3c48"/>
+                      <rect x="4" y="224" width="46" height="92" rx="2" fill="#d8e0e8" stroke="#b8c8d4" stroke-width="1"/>
+                      <!-- Šedá páčka bojler -->
+                      <rect x="7" y="228" width="40" height="13" rx="2" fill="#525252" stroke="#404040" stroke-width="0.8"/>
+                      <rect x="8" y="229" width="38" height="4" rx="1" fill="rgba(255,255,255,0.15)"/>
+                      <rect x="7" y="239" width="40" height="46" rx="2" fill="#6c6c6c" stroke="#565656" stroke-width="0.8"/>
+                      <rect x="8" y="240" width="38" height="16" rx="1" fill="rgba(255,255,255,0.1)"/>
+                      <rect x="8" y="256" width="38" height="28" rx="1" fill="rgba(0,0,0,0.08)"/>
+                      <rect x="8" y="240" width="4" height="44" rx="1" fill="rgba(255,255,255,0.12)"/>
+                      <text x="27" y="268" text-anchor="middle" fill="#e0e8f0" font-size="10" font-weight="bold" font-family="Arial,sans-serif" letter-spacing="1">ON</text>
+                      <rect x="8" y="290" width="38" height="14" rx="2" fill="#eef2f6" stroke="#c4d0da" stroke-width="0.8"/>
+                      <text x="27" y="301" text-anchor="middle" fill="#182028" font-size="9" font-weight="bold" font-family="Arial,sans-serif">B15</text>
+                      <rect x="0" y="316" width="54" height="26" rx="4" fill="#8896a2" stroke="#6a7a86" stroke-width="1"/>
+                      <rect x="0" y="316" width="54" height="6" fill="#8896a2"/>
+                      <circle cx="27" cy="329" r="10" fill="#7a8a96" stroke="#58687a" stroke-width="1.5"/>
+                      <circle cx="27" cy="329" r="7" fill="#8fa0ae" stroke="#6a7a8a" stroke-width="0.8"/>
+                      <line x1="27" y1="322" x2="27" y2="336" stroke="#3a4a58" stroke-width="3" stroke-linecap="round"/>
+                      <line x1="20" y1="329" x2="34" y2="329" stroke="#3a4a58" stroke-width="3" stroke-linecap="round"/>
+                      <rect x="20" y="335" width="14" height="7" rx="2" fill="#2e3c48"/>
+                    </g>
+                    <line x1="400" y1="342" x2="400" y2="380" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 3" opacity="0.5"/>
+                    <text x="400" y="396" text-anchor="middle" fill="rgba(255,255,255,0.65)" font-size="10" font-weight="600">bojler</text>
+
+
+                    <!-- ═══════════════════════════════════════
+                         HLAVNÍ JISTIČ cx=790 — stejný styl jako ostatní, červená páčka, B15
+                    ═══════════════════════════════════════ -->
+                    <g transform="translate(762,0)">
+                      <rect x="2" y="182" width="54" height="195" rx="4" fill="rgba(0,0,0,0.38)" filter="url(#shadow-cb)"/>
+                      <!-- Tělo světle šedé — stejné jako ostatní -->
+                      <rect x="0" y="180" width="54" height="195" rx="4" fill="#9aa5b0" stroke="#7a8a96" stroke-width="1.5"/>
+                      <rect x="0" y="180" width="3" height="195" rx="2" fill="rgba(255,255,255,0.28)"/>
+                      <rect x="51" y="180" width="3" height="195" rx="2" fill="rgba(0,0,0,0.14)"/>
+                      <!-- HORNÍ SVORKA — větší šroub -->
+                      <rect x="0" y="180" width="54" height="52" rx="4" fill="#8896a2" stroke="#6a7a86" stroke-width="1"/>
+                      <rect x="0" y="218" width="54" height="14" fill="#8896a2"/>
+                      <circle cx="27" cy="206" r="17" fill="#7a8a96" stroke="#58687a" stroke-width="2"/>
+                      <circle cx="27" cy="206" r="12" fill="#8fa0ae" stroke="#6a7a8a" stroke-width="1.2"/>
+                      <line x1="27" y1="196" x2="27" y2="216" stroke="#3a4a58" stroke-width="4" stroke-linecap="round"/>
+                      <line x1="17" y1="206" x2="37" y2="206" stroke="#3a4a58" stroke-width="4" stroke-linecap="round"/>
+                      <rect x="20" y="180" width="14" height="8" rx="2" fill="#2e3c48"/>
+                      <!-- BÍLÝ PANEL -->
+                      <rect x="4" y="232" width="46" height="110" rx="2" fill="#d8e0e8" stroke="#b8c8d4" stroke-width="1"/>
+                      <!-- Červená páčka — výčnělek (pruh) nahoře -->
+                      <rect x="7" y="236" width="40" height="15" rx="2" fill="#8b0000" stroke="#6a0000" stroke-width="0.8"/>
+                      <rect x="8" y="237" width="38" height="5" rx="1" fill="rgba(255,150,150,0.15)"/>
+                      <!-- Hlavní tělo páčky červené -->
+                      <rect x="7" y="249" width="40" height="58" rx="2" fill="#c01818" stroke="#a01010" stroke-width="0.8"/>
+                      <rect x="8" y="250" width="38" height="20" rx="1" fill="rgba(255,180,180,0.12)"/>
+                      <rect x="8" y="270" width="38" height="36" rx="1" fill="rgba(0,0,0,0.12)"/>
+                      <rect x="8" y="250" width="4" height="56" rx="1" fill="rgba(255,200,200,0.12)"/>
+                      <text x="27" y="283" text-anchor="middle" fill="#ffe0e0" font-size="10" font-weight="bold" font-family="Arial,sans-serif" letter-spacing="1">ON</text>
+                      <!-- Štítek -->
+                      <rect x="8" y="312" width="38" height="16" rx="2" fill="#eef2f6" stroke="#c4d0da" stroke-width="0.8"/>
+                      <text x="27" y="323" text-anchor="middle" fill="#182028" font-size="9.5" font-weight="bold" font-family="Arial,sans-serif">B15</text>
+                      <!-- DOLNÍ SVORKA -->
+                      <rect x="0" y="338" width="54" height="37" rx="4" fill="#8896a2" stroke="#6a7a86" stroke-width="1"/>
+                      <rect x="0" y="338" width="54" height="8" fill="#8896a2"/>
+                      <circle cx="27" cy="356" r="12" fill="#7a8a96" stroke="#58687a" stroke-width="1.8"/>
+                      <circle cx="27" cy="356" r="8" fill="#8fa0ae" stroke="#6a7a8a" stroke-width="1"/>
+                      <line x1="27" y1="347" x2="27" y2="365" stroke="#3a4a58" stroke-width="3.5" stroke-linecap="round"/>
+                      <line x1="18" y1="356" x2="36" y2="356" stroke="#3a4a58" stroke-width="3.5" stroke-linecap="round"/>
+                      <rect x="20" y="367" width="14" height="8" rx="2" fill="#2e3c48"/>
+                    </g>
+                    <!-- popisek -->
+                    <text x="790" y="400" text-anchor="middle"
+                          fill="rgba(255,255,255,0.6)" font-size="10" font-weight="600">hlavní</text>
+                    <text x="790" y="413" text-anchor="middle"
+                          fill="rgba(255,255,255,0.6)" font-size="10" font-weight="600">jistič</text>
+
+                    <!-- ═══════════════════════════════════════
+                         SHELLY Pro EM-50  x=532..650, y=160..460
+                    ═══════════════════════════════════════ -->
+                    <rect x="532" y="160" width="118" height="300" rx="10"
+                          fill="#0b1422" stroke="#667eea" stroke-width="2.5"/>
+                    <rect x="532" y="160" width="118" height="28" rx="10" fill="#192040"/>
+                    <rect x="532" y="175" width="118" height="13" fill="#192040"/>
+                    <text x="591" y="177" text-anchor="middle"
+                          fill="#b8ccff" font-size="8" font-weight="bold">SHELLY Pro EM-50</text>
+                    <!-- Svorky I O -->
+                    <rect x="540" y="194" width="46" height="24" rx="3"
+                          fill="#101828" stroke="#2a3a55" stroke-width="1.3"/>
+                    <text x="563" y="210" text-anchor="middle"
+                          fill="rgba(255,255,255,0.3)" font-size="12" font-weight="bold">I</text>
+                    <rect x="590" y="194" width="46" height="24" rx="3"
+                          fill="#101828" stroke="#2a3a55" stroke-width="1.3"/>
+                    <text x="613" y="210" text-anchor="middle"
+                          fill="rgba(255,255,255,0.3)" font-size="12" font-weight="bold">O</text>
+                    <text x="591" y="190" text-anchor="middle"
+                          fill="rgba(255,255,255,0.18)" font-size="6.5" font-family="monospace">RELÉ · nepoužito</text>
+                    <line x1="539" y1="228" x2="648" y2="228"
+                          stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                    <!-- LEDs -->
+                    <circle id="ledPower" cx="548" cy="244" r="5.5"
+                            fill="#4ade80" filter="url(#gg)"/>
+                    <text x="561" y="248" fill="rgba(255,255,255,0.6)" font-size="9">Power</text>
+                    <circle id="ledWifi" cx="548" cy="264" r="5.5"
+                            fill="#60a5fa" filter="url(#gb)"/>
+                    <text x="561" y="268" fill="rgba(255,255,255,0.6)" font-size="9">Wi-Fi</text>
+                    <circle cx="548" cy="284" r="5.5" fill="#222d40"/>
+                    <text x="561" y="288" fill="rgba(255,255,255,0.22)" font-size="9">LAN</text>
+                    <circle cx="548" cy="304" r="5.5" fill="#222d40"/>
+                    <text x="561" y="308" fill="rgba(255,255,255,0.22)" font-size="9">Out</text>
+                    <circle cx="548" cy="324" r="5.5" fill="#222d40"/>
+                    <text x="561" y="328" fill="rgba(255,255,255,0.22)" font-size="9">Count</text>
+                    <line x1="539" y1="340" x2="648" y2="340"
+                          stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                    <!-- Reset -->
+                    <circle cx="591" cy="365" r="19" fill="none"
+                            stroke="#1e2d45" stroke-width="1.5"/>
+                    <circle cx="591" cy="365" r="13" fill="#101828"
+                            stroke="#2a3d58" stroke-width="1.2"/>
+                    <text x="591" y="379" text-anchor="middle"
+                          fill="rgba(255,255,255,0.15)" font-size="8">Reset</text>
+                    <line x1="539" y1="392" x2="648" y2="392"
+                          stroke="rgba(255,255,255,0.09)" stroke-width="1"/>
+                    <!-- Svorky IA IB / N L -->
+                    <rect x="539" y="399" width="46" height="20" rx="3"
+                          fill="#041204" stroke="#4ade80" stroke-width="2.2"/>
+                    <text x="562" y="413" text-anchor="middle"
+                          fill="#4ade80" font-size="9" font-weight="bold">IA</text>
+                    <rect x="589" y="399" width="46" height="20" rx="3"
+                          fill="#12141e" stroke="#4b5563" stroke-width="1.2"/>
+                    <text x="612" y="413" text-anchor="middle"
+                          fill="rgba(255,255,255,0.22)" font-size="9">IB</text>
+                    <rect x="539" y="423" width="46" height="20" rx="3"
+                          fill="#04081a" stroke="#3b82f6" stroke-width="1.5" opacity="0.8"/>
+                    <text x="562" y="437" text-anchor="middle"
+                          fill="#60a5fa" font-size="9" opacity="0.8">N</text>
+                    <rect x="589" y="423" width="46" height="20" rx="3"
+                          fill="#180f00" stroke="#ef4444" stroke-width="2.2"/>
+                    <text x="612" y="437" text-anchor="middle"
+                          fill="#ef4444" font-size="9" font-weight="bold">L</text>
+
+                    <!-- ═══════════════════════════════════════
+                         ČERVENÁ SBĚRNICE  y=130 — sahá od x=72 do x=725
+                         Kreslíme AŽ TEĎ — bude vidět přes jističe
+                    ═══════════════════════════════════════ -->
+                    <line id="lBus" x1="72" y1="130" x2="725" y2="130"
+                          stroke="#ef4444" stroke-width="4" stroke-linecap="round"
+                          class="flow-line-idle" opacity="1"/>
+
+                    <!-- svislé vodiče ze sběrnice do jističů (nové cx: 100,200,300,400) -->
+                    <line id="lK" x1="100" y1="130" x2="100" y2="181"
+                          stroke="#ef4444" stroke-width="2.5" class="flow-line-idle"/>
+                    <line id="lS" x1="200" y1="130" x2="200" y2="181"
+                          stroke="#ef4444" stroke-width="2.5" class="flow-line-idle"/>
+                    <line id="lZ" x1="300" y1="130" x2="300" y2="181"
+                          stroke="#ef4444" stroke-width="2.5" class="flow-line-idle"/>
+                    <line id="lB" x1="400" y1="130" x2="400" y2="181"
+                          stroke="#ef4444" stroke-width="2.5" class="flow-line-idle"/>
+
+                    <!-- ═══════════════════════════════════════
+                         NAPÁJENÍ SBĚRNICE Z HLAVNÍHO JISTIČE
+                         Vstup ze sítě shora → horní svorka (790,180)
+                         Výstup ze spodní svorky (790,332) → dolů (790,510)
+                         → doleva na x=725 (vlevo od jističe x=762, žádné překrytí)
+                         → svisle nahoru na y=130 (napojení na sběrnici)
+                    ═══════════════════════════════════════ -->
+                    <line id="lMainTop" x1="790" y1="74" x2="790" y2="181"
+                          stroke="#ef4444" stroke-width="4" stroke-linecap="round"
+                          class="flow-line-idle" opacity="1"/>
+                    <text x="790" y="68" text-anchor="middle"
+                          fill="rgba(255,255,255,0.3)" font-size="8" font-family="monospace">ze sítě</text>
+                    <!-- výstup jističe svisle dolů -->
+                    <line id="lJOut1" x1="790" y1="377" x2="790" y2="510"
+                          stroke="#ef4444" stroke-width="4" stroke-linecap="round"
+                          class="flow-line-idle" opacity="1"/>
+                    <!-- ohyb doleva — 37px vlevo od jističe -->
+                    <line id="lJOut2" x1="725" y1="510" x2="790" y2="510"
+                          stroke="#ef4444" stroke-width="4" stroke-linecap="round"
+                          class="flow-line-idle" opacity="1"/>
+                    <!-- svisle nahoru ke sběrnici — napojení na konec sběrnice x=725 -->
+                    <line id="lJOut3" x1="725" y1="130" x2="725" y2="510"
+                          stroke="#ef4444" stroke-width="4" stroke-linecap="round"
+                          class="flow-line-idle" opacity="1"/>
+
+                    <!-- ═══════════════════════════════════════
+                         CT kroužek — posunut na x=480, kreslíme PŘES sběrnici
+                    ═══════════════════════════════════════ -->
+                    <circle cx="480" cy="130" r="24"
+                            fill="#061a06" stroke="#4ade80" stroke-width="3" filter="url(#gg)"/>
+                    <circle cx="480" cy="130" r="9"
+                            fill="#020d02" stroke="#4ade80" stroke-width="2"/>
+
+                    <!-- ═══════════════════════════════════════
+                         VODIČ ze sběrnice → svorka L Shelly
+                         Bod výstupu: x=460, y=130 (VLEVO od CT x=480)
+                         Trasa: (460,130) → (460,470) pod Shelly box (končí y=460)
+                               → (612,470) doprava
+                               → (612,443) nahoru do svorky L
+                    ═══════════════════════════════════════ -->
+                    <line id="lL" x1="460" y1="130" x2="460" y2="470"
+                          stroke="#ef4444" stroke-width="2.5" class="flow-line-idle" opacity="0.9"/>
+                    <line id="lLb" x1="460" y1="470" x2="612" y2="470"
+                          stroke="#ef4444" stroke-width="2.5" class="flow-line-idle" opacity="0.9"/>
+                    <line id="lLu" x1="612" y1="443" x2="612" y2="470"
+                          stroke="#ef4444" stroke-width="2.5" class="flow-line-idle" opacity="0.9"/>
+
+                    <!-- zelený vývod z CT dolů ke svorce IA -->
+                    <line id="lCT" x1="480" y1="154" x2="480" y2="409"
+                          stroke="#4ade80" stroke-width="2.5" class="flow-line-active" opacity="0.85"/>
+                    <line x1="480" y1="409" x2="562" y2="409"
+                          stroke="#4ade80" stroke-width="2.5" opacity="0.7"/>
+
+                    <!-- ═══════════════════════════════════════
+                         ČERVENÁ ČÁRA: svorka L → dolů → doprava → nahoru k jističi
+                    ═══════════════════════════════════════ -->
+                    <line id="lL4" x1="635" y1="433" x2="700" y2="433"
+                          stroke="#ef4444" stroke-width="4" class="flow-line-idle" filter="url(#gy)" opacity="0.9"/>
+                    <line id="lL3" x1="700" y1="433" x2="700" y2="468"
+                          stroke="#ef4444" stroke-width="4" class="flow-line-idle" filter="url(#gy)" opacity="0.9"/>
+                    <line id="lL2" x1="700" y1="468" x2="790" y2="468"
+                          stroke="#ef4444" stroke-width="4" class="flow-line-idle" filter="url(#gy)" opacity="0.9"/>
+                    <line id="lL1" x1="790" y1="435" x2="790" y2="468"
+                          stroke="#ef4444" stroke-width="4" class="flow-line-idle" filter="url(#gy)" opacity="0.9"/>
+
+                    <!-- NAPĚTÍ — pod Shelly boxem -->
+                    <rect x="625" y="456" width="76" height="36" rx="7"
+                          fill="rgba(3,6,26,0.97)" stroke="rgba(96,165,250,0.45)" stroke-width="1.4"/>
+                    <text x="663" y="471" text-anchor="middle"
+                          fill="rgba(255,255,255,0.32)" font-size="7.5" font-family="monospace">NAPĚTÍ</text>
+                    <text id="svgVoltage" x="663" y="487" text-anchor="middle"
+                          fill="#60a5fa" font-size="14" font-weight="bold" filter="url(#gb)">--- V</text>
+
+                    <!-- MODRÁ ČÁRA N ze svorky N doleva -->
+                    <line id="lN" x1="539" y1="433" x2="60" y2="433"
+                          stroke="#3b82f6" stroke-width="2.5" stroke-dasharray="8 5" opacity="0.6"/>
+                    <text x="40" y="437" fill="#60a5fa" font-size="11"
+                          font-weight="bold" opacity="0.7">N</text>
+
+                    <!-- ═══════════════════════════════════════
+                         TOK DAT  (spodní pruh)
+                    ═══════════════════════════════════════ -->
+                    <line x1="20" y1="505" x2="880" y2="505"
+                          stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                    <text x="450" y="516" text-anchor="middle"
+                          fill="rgba(255,255,255,0.2)" font-size="7" font-family="monospace"
+                          letter-spacing="2">TOK DAT</text>
+
+                    <!-- uzly, y=518 -->
+                    <rect x="20"  y="526" width="76" height="24" rx="5"
+                          fill="rgba(16,26,52,0.95)" stroke="#667eea" stroke-width="1.2"/>
+                    <text x="58" y="542" text-anchor="middle"
+                          fill="rgba(255,255,255,0.6)" font-size="7.5" font-weight="bold">Shelly</text>
+
+                    <line id="ld1" x1="96" y1="538" x2="112" y2="538"
+                          stroke="#667eea" stroke-width="1.8" class="flow-line-active" marker-end="url(#aW)"/>
+
+                    <rect x="114" y="524" width="80" height="24" rx="5"
+                          fill="rgba(16,26,52,0.95)" stroke="#667eea" stroke-width="1.2"/>
+                    <text x="154" y="530" text-anchor="middle"
+                          fill="rgba(255,255,255,0.6)" font-size="7" font-weight="bold" font-family="monospace">Doma_EXT</text>
+
+                    <line id="ld2" x1="194" y1="538" x2="210" y2="538"
+                          stroke="#667eea" stroke-width="1.8" class="flow-line-active" marker-end="url(#aW)"/>
+
+                    <rect x="212" y="524" width="80" height="24" rx="5"
+                          fill="rgba(16,26,52,0.95)" stroke="#667eea" stroke-width="1.2"/>
+                    <text x="252" y="535" text-anchor="middle"
+                          fill="rgba(255,255,255,0.6)" font-size="7" font-weight="bold">Shelly</text>
+                    <text x="252" y="546" text-anchor="middle"
+                          fill="rgba(255,255,255,0.6)" font-size="7">Cloud</text>
+
+                    <line id="ld3" x1="292" y1="538" x2="308" y2="538"
+                          stroke="#60a5fa" stroke-width="1.8" class="flow-line-active" marker-end="url(#aB)"/>
+
+                    <rect x="310" y="526" width="82" height="24" rx="5"
+                          fill="rgba(8,16,38,0.95)" stroke="#60a5fa" stroke-width="1.2"/>
+                    <text x="351" y="523" text-anchor="middle"
+                          fill="#60a5fa" font-size="7" font-weight="bold">tmep.cz</text>
+                    <text x="351" y="534" text-anchor="middle"
+                          fill="rgba(255,255,255,0.3)" font-size="6">elektromersazava</text>
+
+                    <line id="ld4" x1="392" y1="538" x2="408" y2="538"
+                          stroke="#60a5fa" stroke-width="1.8" class="flow-line-active" marker-end="url(#aB)"/>
+
+                    <rect x="410" y="526" width="86" height="24" rx="5"
+                          fill="rgba(8,16,38,0.95)" stroke="#60a5fa" stroke-width="1.2"/>
+                    <text x="453" y="523" text-anchor="middle"
+                          fill="#60a5fa" font-size="7" font-weight="bold">Google</text>
+                    <text x="453" y="534" text-anchor="middle"
+                          fill="rgba(255,255,255,0.3)" font-size="6">Apps Script</text>
+
+                    <line id="ld5" x1="496" y1="538" x2="512" y2="538"
+                          stroke="#c084fc" stroke-width="1.8" class="flow-line-active" marker-end="url(#aP)"/>
+
+                    <rect x="514" y="526" width="78" height="24" rx="5"
+                          fill="rgba(12,10,32,0.95)" stroke="#c084fc" stroke-width="1.2"/>
+                    <text x="553" y="523" text-anchor="middle"
+                          fill="#c084fc" font-size="7" font-weight="bold">SQL DB</text>
+                    <text x="553" y="534" text-anchor="middle"
+                          fill="rgba(255,255,255,0.3)" font-size="6">webzdarma.cz</text>
+
+                    <line id="ld6" x1="592" y1="538" x2="608" y2="538"
+                          stroke="#4ade80" stroke-width="1.8" class="flow-line-active" marker-end="url(#aG)"/>
+
+                    <rect x="610" y="526" width="94" height="24" rx="5"
+                          fill="rgba(5,18,8,0.95)" stroke="#4ade80" stroke-width="1.2"/>
+                    <text x="657" y="523" text-anchor="middle"
+                          fill="#4ade80" font-size="7" font-weight="bold">GitHub Pages</text>
+                    <text x="657" y="534" text-anchor="middle"
+                          fill="rgba(255,255,255,0.3)" font-size="6">jakubb167.github.io</text>
+
+                  </svg>
+                </div>
+
+                <!-- Status pills -->
+                <div class="diag-status-row" style="margin-top:18px;">
+                    <div class="diag-status-pill ok" id="diagStatusCT">
+                        <div class="diag-dot ok"></div> CT&#x2081; aktivn&iacute;
+                    </div>
+                    <div class="diag-status-pill off">
+                        <div class="diag-dot off"></div> Rel&eacute; nepou&#382;ito
+                    </div>
+                    <div class="diag-status-pill ok" id="diagStatusDB">
+                        <div class="diag-dot ok"></div> DB p&#345;ipojena
+                    </div>
+                    <div class="diag-status-pill" id="diagStatusVoltage"
+                         style="background:rgba(251,191,36,0.1);border-color:rgba(251,191,36,0.3);color:#fbbf24;">
+                        <div class="diag-dot warn"></div>
+                        <span id="diagStatusVoltageText">Nap&#283;t&iacute; OK</span>
+                    </div>
+                </div>
+                <div class="diag-last-update" id="diagLastUpdate">Posledn&iacute; m&#283;&#345;en&iacute;: &ndash;</div>
+            </div>
+        </div>
     </div>
     <script>
         const PHP_DATA_URL = 'https://shrill-sunset-56af.baborovsky-jakub.workers.dev/';
@@ -635,6 +1674,8 @@
                 updateSection('aggregated');
                 updateSection('statistics');
                 updateHeatmap();
+                updateDiagramTabVisibility();
+                updateDiagram();
             } catch (error) {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').textContent = '❌ ' + error.message;
@@ -1173,6 +2214,255 @@
                 ctx.fillRect(i * barWidth, h - barHeight, barWidth * 0.8, barHeight);
             });
         }
+
+        // ══════════════════════════════
+        //  DIAGRAM
+        // ══════════════════════════════
+        function updateDiagram() {
+            if (getSelectedSource() !== 'elektromer') return;
+
+            // Poslední záznam energie
+            const last = rawData.length > 0 ? rawData[rawData.length - 1] : null;
+            const totalKwh = spotrebaData.reduce((s, d) => s + d.spotreba, 0);
+
+            // Metriky panely
+            if (last) {
+                const vykon = last.vykonW;
+                const napeti = last.napeti;
+                const proud = last.proud;
+                const va = napeti * proud;
+                const pf = va > 0 ? Math.min(1, vykon / va) : 0;
+
+                document.getElementById('diagPower').textContent = vykon.toFixed(0) + ' W';
+                document.getElementById('diagVoltage').textContent = napeti.toFixed(1) + ' V';
+                document.getElementById('diagCurrent').textContent = proud.toFixed(2) + ' A';
+                document.getElementById('diagPowerTime').textContent = last.datetime.toLocaleTimeString('cs-CZ', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+                document.getElementById('diagLastUpdate').textContent = 'Poslední měření: ' + formatDateTime(last.datetime);
+
+                // SVG inline hodnoty
+                const svgP = document.getElementById('svgPower');
+                if (svgP) svgP.textContent = vykon.toFixed(0) + ' W';
+                const svgV = document.getElementById('svgVoltage');
+                if (svgV) svgV.textContent = napeti.toFixed(1) + ' V';
+                const svgA = document.getElementById('svgCurrent');
+                if (svgA) svgA.textContent = proud.toFixed(2) + ' A';
+
+                // Animace vodičů podle výkonu
+                const isActive = vykon > 1;
+                const lineClass = isActive ? 'flow-line-active' : 'flow-line-idle';
+                ['lBus','lK','lS','lZ','lB','lL','lLb','lLu','lL1','lL2','lL3','lL4','lN','lCT','lMainTop','lJOut1','lJOut2','lJOut3'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.setAttribute('class', lineClass);
+                });
+                ['ld1','ld2','ld3','ld4','ld5','ld6'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.setAttribute('class', 'flow-line-active');
+                });
+
+                // Napětí status
+                const vStatusText = document.getElementById('diagStatusVoltageText');
+                const vPill = document.getElementById('diagStatusVoltage');
+                if (napeti < 207 || napeti > 253) {
+                    if (vStatusText) vStatusText.textContent = `Napětí ${napeti.toFixed(1)} V ⚠`;
+                    if (vPill) { vPill.className = 'diag-status-pill warn'; vPill.querySelector('.diag-dot').className = 'diag-dot warn'; }
+                } else {
+                    if (vStatusText) vStatusText.textContent = `Napětí OK (${napeti.toFixed(1)} V)`;
+                    if (vPill) { vPill.className = 'diag-status-pill ok'; vPill.querySelector('.diag-dot').className = 'diag-dot ok'; }
+                }
+
+                // LED Wi-Fi bliká
+                const ledWifi = document.getElementById('ledWifi');
+                if (ledWifi) ledWifi.style.opacity = (Date.now() % 2000 < 1000) ? '1' : '0.3';
+            }
+
+            const svgS = document.getElementById('svgSpotreba');
+            if (svgS) svgS.textContent = totalKwh.toFixed(3) + ' kWh';
+            document.getElementById('diagSpotreba').textContent = totalKwh.toFixed(3) + ' kWh';
+
+            // Načti aktuální data Shelly PM mini pro panel nad Kamery
+            fetchShellyPmMini();
+        }
+
+        // Načte poslední záznam ze zdroje "shelly" a zobrazí ho v SVG panelu (PM mini nad Kamery)
+        async function fetchShellyPmMini() {
+            try {
+                const url = PHP_DATA_URL + '?days=1&source=shelly';
+                const resp = await fetch(url);
+                if (!resp.ok) return;
+                const json = await resp.json();
+                if (json.status !== 'success' || !json.data || json.data.length === 0) return;
+                const sorted = json.data
+                    .filter(r => r.vykon !== null)
+                    .sort((a, b) => new Date(a.datum_a_cas) - new Date(b.datum_a_cas));
+                const last = sorted[sorted.length - 1];
+                if (!last) return;
+                const svgSP = document.getElementById('svgShellyPower');
+                const svgSA = document.getElementById('svgShellyCurrent');
+                if (svgSP) svgSP.textContent = Number(last.vykon).toFixed(0) + ' W';
+                if (svgSA) svgSA.textContent = Number(last.proud).toFixed(2) + ' A';
+            } catch(e) { /* tiché selhání — panel zůstane na --- */ }
+        }
+
+        // Viditelnost záložky Diagram — zobrazena pro oba zdroje
+        function updateDiagramTabVisibility() {
+            const tab = document.getElementById('diagramTab');
+            if (!tab) return;
+            tab.style.display = '';
+        }
+
+        // Přepsat onDataSourceChange aby zahrnoval diagram
+        const _origOnDataSourceChange = onDataSourceChange;
+        // Overridujeme přímo:
+        function onDataSourceChange() {
+            const source = getSelectedSource();
+            const badge = document.getElementById('sourceBadge');
+            if (source === 'elektromer') {
+                badge.textContent = '● Elektroměr Sázava';
+                badge.className = 'source-badge elektromer';
+            } else {
+                badge.textContent = '● Shelly Sázava';
+                badge.className = 'source-badge';
+            }
+            updateDiagramTabVisibility();
+            Object.values(charts).forEach(c => c.destroy());
+            charts = {};
+            sliders = {};
+            loadData();
+        }
+
+        // Hook do loadData – po načtení dat aktualizuj diagram
+        const _origLoadData = loadData;
+        // Přidáme volání updateDiagram a updateDiagramTabVisibility po loadData
+        // (prostě zavoláme je v sekcích kde se data zpracovávají – viz níže přes interval)
+        setInterval(() => {
+            if (currentPage === 'diagram') updateDiagram();
+        }, 2000);
+
+        // Hookneme switchPage aby při přechodu na diagram data ihned zobrazil
+        const _origSwitchPage = switchPage;
+        function switchPage(pageName, el) {
+            currentPage = pageName;
+            document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('page-' + pageName).classList.add('active');
+            el.classList.add('active');
+            if (pageName === 'diagram') updateDiagram();
+        }
+
+        // Po každém loadData také aktualizuj
+        const _origLoadDataEnd = loadData;
+        // Přepíšeme loadData aby volalo updateDiagram po dokončení
+        const __realLoadData = loadData;
+
+        /* ══════════════════════════════════════
+           LIGHT / DARK THEME TOGGLE
+        ══════════════════════════════════════ */
+        function applyDiagramTheme(isLight) {
+            const svg = document.getElementById('diagramSVG');
+            if (!svg) return;
+
+            // Mapování: tmavá barva → světlá náhrada
+            const fillMap = {
+                // SVG pozadí
+                '#0d1b2a': isLight ? '#c8d4e4' : '#0d1b2a',
+                '#0a1220': isLight ? '#c8d4e4' : '#0a1220',
+                // Shelly panel, tmavé bloky
+                '#1e2d40': isLight ? '#aabcce' : '#1e2d40',
+                '#162030': isLight ? '#aabcce' : '#162030',
+                '#0d1828': isLight ? '#aabcce' : '#0d1828',
+                '#0a1422': isLight ? '#aabcce' : '#0a1422',
+                '#0b1422': isLight ? '#aabcce' : '#0b1422',
+                '#12141e': isLight ? '#aabcce' : '#12141e',
+                '#04081a': isLight ? '#aabcce' : '#04081a',
+                '#192040': isLight ? '#aabcce' : '#192040',
+                '#1a2030': isLight ? '#aabcce' : '#1a2030',
+                // DIN lišta, tmavě šedé rámy
+                '#1a2535': isLight ? '#7a8fa0' : '#1a2535',
+                '#263040': isLight ? '#7a8fa0' : '#263040',
+                '#2a3848': isLight ? '#7a8fa0' : '#2a3848',
+                '#1e2a38': isLight ? '#7a8fa0' : '#1e2a38',
+                '#222d40': isLight ? '#7a8fa0' : '#222d40',
+                '#101828': isLight ? '#8898aa' : '#101828',
+                // Metrické okénka (PROUD/VÝKON panely v SVG)
+                '#0a0e18': isLight ? '#dde6f0' : '#0a0e18',
+                '#060a14': isLight ? '#dde6f0' : '#060a14',
+                '#080c16': isLight ? '#dde6f0' : '#080c16',
+                '#030810': isLight ? '#dde6f0' : '#030810',
+                '#0a1020': isLight ? '#dde6f0' : '#0a1020',
+                '#18202a': isLight ? '#dde6f0' : '#18202a',
+                // Pipeline / flow boxy
+                'rgba(16,26,52,0.95)':  isLight ? 'rgba(200,215,235,0.95)' : 'rgba(16,26,52,0.95)',
+                'rgba(8,16,38,0.95)':   isLight ? 'rgba(200,215,235,0.95)' : 'rgba(8,16,38,0.95)',
+                'rgba(10,10,40,0.97)':  isLight ? 'rgba(200,215,235,0.97)' : 'rgba(10,10,40,0.97)',
+                'rgba(12,10,32,0.95)':  isLight ? 'rgba(200,215,235,0.95)' : 'rgba(12,10,32,0.95)',
+                'rgba(3,6,26,0.97)':    isLight ? 'rgba(200,215,235,0.97)' : 'rgba(3,6,26,0.97)',
+                'rgba(3,12,3,0.97)':    isLight ? 'rgba(215,235,215,0.97)' : 'rgba(3,12,3,0.97)',
+                'rgba(5,18,8,0.95)':    isLight ? 'rgba(210,235,210,0.95)' : 'rgba(5,18,8,0.95)',
+                'rgba(6,10,20,0.97)':   isLight ? 'rgba(200,215,235,0.97)' : 'rgba(6,10,20,0.97)',
+            };
+
+            // Mapování textu: původní → světlá náhrada
+            const textFillMap = {
+                // Bílé/světlé texty → tmavé
+                'rgba(255,255,255,0.75)': isLight ? 'rgba(15,25,50,0.82)' : 'rgba(255,255,255,0.75)',
+                'rgba(255,255,255,0.65)': isLight ? 'rgba(15,25,50,0.7)'  : 'rgba(255,255,255,0.65)',
+                'rgba(255,255,255,0.6)':  isLight ? 'rgba(15,25,50,0.65)' : 'rgba(255,255,255,0.6)',
+                'rgba(255,255,255,0.55)': isLight ? 'rgba(15,25,50,0.6)'  : 'rgba(255,255,255,0.55)',
+                'rgba(255,255,255,0.45)': isLight ? 'rgba(15,25,50,0.5)'  : 'rgba(255,255,255,0.45)',
+                'rgba(255,255,255,0.3)':  isLight ? 'rgba(15,25,50,0.35)' : 'rgba(255,255,255,0.3)',
+                '#fff': isLight ? '#0f1932' : '#fff',
+                // Barevné hodnoty — ztlumit pro světlý kontrast
+                '#fbbf24': isLight ? '#b45309' : '#fbbf24',
+                '#4ade80': isLight ? '#15803d' : '#4ade80',
+                '#60a5fa': isLight ? '#1d4ed8' : '#60a5fa',
+                '#c084fc': isLight ? '#6d28d9' : '#c084fc',
+                '#ef4444': isLight ? '#b91c1c' : '#ef4444',
+                // Texty na bílých štítcích jističů — beze změny
+                '#182028': '#182028',
+                '#1a2030': '#1a2030',
+            };
+
+            // Projdi všechny SVG elementy a aplikuj mapování
+            svg.querySelectorAll('[fill]').forEach(el => {
+                const f = el.getAttribute('fill');
+                if (fillMap[f] !== undefined) el.setAttribute('fill', fillMap[f]);
+            });
+            svg.querySelectorAll('text[fill]').forEach(el => {
+                const f = el.getAttribute('fill');
+                if (textFillMap[f] !== undefined) el.setAttribute('fill', textFillMap[f]);
+            });
+            // Stroke na čarách
+            const strokeMap = {
+                '#60a5fa': isLight ? '#2563eb' : '#60a5fa',
+                '#667eea': isLight ? '#4338ca' : '#667eea',
+                '#4ade80': isLight ? '#15803d' : '#4ade80',
+            };
+            svg.querySelectorAll('[stroke]').forEach(el => {
+                const s = el.getAttribute('stroke');
+                if (strokeMap[s] !== undefined) el.setAttribute('stroke', strokeMap[s]);
+            });
+        }
+
+        function toggleTheme() {
+            const isLight = document.body.classList.toggle('light-theme');
+            document.getElementById('themeIcon').textContent  = isLight ? '☀️' : '🌙';
+            document.getElementById('themeLabel').textContent = isLight ? 'Světlý' : 'Tmavý';
+            applyDiagramTheme(isLight);
+            try { localStorage.setItem('dashTheme', isLight ? 'light' : 'dark'); } catch(e) {}
+        }
+
+        // Obnov uložené nastavení při načtení
+        (function() {
+            try {
+                if (localStorage.getItem('dashTheme') === 'light') {
+                    document.body.classList.add('light-theme');
+                    document.getElementById('themeIcon').textContent  = '☀️';
+                    document.getElementById('themeLabel').textContent = 'Světlý';
+                    // SVG ještě nemusí být připraveno — počkáme
+                    window.addEventListener('load', () => applyDiagramTheme(true));
+                }
+            } catch(e) {}
+        })();
     </script>
 </body>
 </html>
