@@ -2219,9 +2219,23 @@
         //  DIAGRAM
         // ══════════════════════════════
         function updateDiagram() {
-            if (getSelectedSource() !== 'elektromer') return;
+            const source = getSelectedSource();
 
-            // Poslední záznam energie
+            if (source === 'shelly') {
+                // Pro Shelly: načti aktuální data a zobraz je v záhlaví diagramu
+                updateDiagramShellyHeader();
+                // SVG animace podle posledního známého výkonu z rawData
+                const last = rawData.length > 0 ? rawData[rawData.length - 1] : null;
+                const isActive = last && last.vykonW > 1;
+                const lineClass = isActive ? 'flow-line-active' : 'flow-line-idle';
+                ['lBus','lK','lS','lZ','lB','lL','lLb','lLu','lL1','lL2','lL3','lL4','lN','lCT','lMainTop','lJOut1','lJOut2','lJOut3'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.setAttribute('class', lineClass);
+                });
+                return;
+            }
+
+            // === ELEKTROMĚR ===
             const last = rawData.length > 0 ? rawData[rawData.length - 1] : null;
             const totalKwh = spotrebaData.reduce((s, d) => s + d.spotreba, 0);
 
@@ -2281,6 +2295,43 @@
 
             // Načti aktuální data Shelly PM mini pro panel nad Kamery
             fetchShellyPmMini();
+        }
+
+        // Načte poslední Shelly data a zobrazí je v záhlaví diagramu (pro zdroj Shelly)
+        async function updateDiagramShellyHeader() {
+            try {
+                const url = PHP_DATA_URL + '?days=1&source=shelly';
+                const resp = await fetch(url);
+                if (!resp.ok) return;
+                const json = await resp.json();
+                if (json.status !== 'success' || !json.data || json.data.length === 0) return;
+                const sorted = json.data
+                    .filter(r => r.vykon !== null)
+                    .sort((a, b) => new Date(a.datum_a_cas) - new Date(b.datum_a_cas));
+                const last = sorted[sorted.length - 1];
+                if (!last) return;
+
+                const vykon  = Number(last.vykon  ?? last.vykonW ?? 0);
+                const proud  = Number(last.proud  ?? 0);
+                const napeti = Number(last.napeti ?? 0);
+                const totalKwh = sorted.reduce((s, r) => s + Number(r.spotreba ?? 0), 0);
+                const cas = new Date(last.datum_a_cas);
+
+                document.getElementById('diagPower').textContent   = vykon.toFixed(0)  + ' W';
+                document.getElementById('diagCurrent').textContent = proud.toFixed(2)  + ' A';
+                document.getElementById('diagVoltage').textContent = napeti > 0 ? napeti.toFixed(1) + ' V' : '--- V';
+                document.getElementById('diagSpotreba').textContent = totalKwh.toFixed(3) + ' kWh';
+                document.getElementById('diagPowerTime').textContent = isNaN(cas) ? '--:--:--'
+                    : cas.toLocaleTimeString('cs-CZ', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+                const lu = document.getElementById('diagLastUpdate');
+                if (lu) lu.textContent = 'Poslední měření: ' + (isNaN(cas) ? '?' : formatDateTime(cas));
+
+                // Shelly PM mini SVG panel
+                const svgSP = document.getElementById('svgShellyPower');
+                const svgSA = document.getElementById('svgShellyCurrent');
+                if (svgSP) svgSP.textContent = vykon.toFixed(0) + ' W';
+                if (svgSA) svgSA.textContent = proud.toFixed(2) + ' A';
+            } catch(e) { /* tiché selhání */ }
         }
 
         // Načte poslední záznam ze zdroje "shelly" a zobrazí ho v SVG panelu (PM mini nad Kamery)
